@@ -1,0 +1,4 @@
+rootProject.name = 'acuant_flutter'
+//include ':app'
+//include ':acuantcamera', ':acuantfacecapture'
+//project(':acuantcamera').projectDir = new File(settingsDir, './acuantcamera')
