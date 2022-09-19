@@ -283,10 +283,8 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
-//        TODO("Not yet implemented")
     }
 
     override fun onDetachedFromActivity() {
-//        TODO("Not yet implemented")
     }
 }
