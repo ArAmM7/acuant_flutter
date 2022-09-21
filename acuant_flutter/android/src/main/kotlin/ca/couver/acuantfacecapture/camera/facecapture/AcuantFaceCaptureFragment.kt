@@ -24,7 +24,7 @@ enum class FaceCameraState {
     Align, MoveCloser, MoveBack, FixRotation, KeepSteady, Hold, Blink, Capturing
 }
 
-class AcuantFaceCaptureFragment: AcuantBaseFaceCameraFragment() {
+class AcuantFaceCaptureFragment : AcuantBaseFaceCameraFragment() {
 
     private var cameraUiContainerBinding: FaceFragmentUiBinding? = null
     private var mFacialGraphicOverlay: FacialGraphicOverlay? = null
@@ -41,12 +41,12 @@ class AcuantFaceCaptureFragment: AcuantBaseFaceCameraFragment() {
         super.onViewCreated(view, savedInstanceState)
 
         cameraUiContainerBinding?.root?.let {
-            fragmentCameraBinding!!.root.removeView(it)
+            fragmentCameraBinding!!.uiHolder.removeView(it)
         }
 
         cameraUiContainerBinding = FaceFragmentUiBinding.inflate(
             LayoutInflater.from(requireContext()),
-            fragmentCameraBinding!!.root,
+            fragmentCameraBinding!!.uiHolder,
             true
         )
 
@@ -107,7 +107,8 @@ class AcuantFaceCaptureFragment: AcuantBaseFaceCameraFragment() {
             null
         }
         val realState = if (previewView != null && boundingBox != null) {
-            val view = Rect(previewView.left, previewView.top, previewView.right, previewView.bottom)
+            val view =
+                Rect(previewView.left, previewView.top, previewView.right, previewView.bottom)
             if (!view.contains(boundingBox)) {
                 FaceState.NoFace
             } else {
@@ -121,21 +122,25 @@ class AcuantFaceCaptureFragment: AcuantBaseFaceCameraFragment() {
             FaceState.NoFace -> {
                 faceImage?.visibility = View.VISIBLE
                 mFacialGraphicOverlay?.setState(FaceCameraState.Align)
+                hideBlink()
                 mFacialGraphic?.updateLiveFaceDetails(null, FaceCameraState.Align)
                 resetTimer()
             }
             FaceState.FaceTooFar -> {
                 mFacialGraphicOverlay?.setState(FaceCameraState.MoveCloser)
+                hideBlink()
                 mFacialGraphic?.updateLiveFaceDetails(boundingBox, FaceCameraState.MoveCloser)
                 resetTimer()
             }
             FaceState.FaceTooClose -> {
                 mFacialGraphicOverlay?.setState(FaceCameraState.MoveBack)
+                hideBlink()
                 mFacialGraphic?.updateLiveFaceDetails(boundingBox, FaceCameraState.MoveBack)
                 resetTimer()
             }
             FaceState.FaceAngled -> {
                 mFacialGraphicOverlay?.setState(FaceCameraState.FixRotation)
+                hideBlink()
                 mFacialGraphic?.updateLiveFaceDetails(boundingBox, FaceCameraState.FixRotation)
                 resetTimer()
             }
@@ -143,7 +148,11 @@ class AcuantFaceCaptureFragment: AcuantBaseFaceCameraFragment() {
                 when {
                     didFaceMove(boundingBox, lastFacePosition) -> {
                         mFacialGraphicOverlay?.setState(FaceCameraState.KeepSteady)
-                        mFacialGraphic?.updateLiveFaceDetails(boundingBox, FaceCameraState.KeepSteady)
+                        hideBlink()
+                        mFacialGraphic?.updateLiveFaceDetails(
+                            boundingBox,
+                            FaceCameraState.KeepSteady
+                        )
                         resetTimer()
                     }
                     requireBlink && !userHasBlinked -> {
@@ -154,16 +163,25 @@ class AcuantFaceCaptureFragment: AcuantBaseFaceCameraFragment() {
                             userHasHadOpenEyes = true
                         }
                         mFacialGraphicOverlay?.setState(FaceCameraState.Blink)
+                        showBlink()
                         mFacialGraphic?.updateLiveFaceDetails(boundingBox, FaceCameraState.Blink)
                         resetTimer(resetBlinkState = false)
                     }
                     System.currentTimeMillis() - startTime < acuantOptions.totalCaptureTime * 1000 -> {
-                        mFacialGraphicOverlay?.setState(FaceCameraState.Hold, acuantOptions.totalCaptureTime - ceil(((System.currentTimeMillis() - startTime) / 1000).toDouble()).toInt())
+                        mFacialGraphicOverlay?.setState(
+                            FaceCameraState.Hold,
+                            acuantOptions.totalCaptureTime - ceil(((System.currentTimeMillis() - startTime) / 1000).toDouble()).toInt()
+                        )
+                        hideBlink()
                         mFacialGraphic?.updateLiveFaceDetails(boundingBox, FaceCameraState.Hold)
                     }
                     else -> {
                         mFacialGraphicOverlay?.setState(FaceCameraState.Capturing)
-                        mFacialGraphic?.updateLiveFaceDetails(boundingBox, FaceCameraState.Capturing)
+                        hideBlink()
+                        mFacialGraphic?.updateLiveFaceDetails(
+                            boundingBox,
+                            FaceCameraState.Capturing
+                        )
                         if (!capturing) {
                             captureImage(object : IAcuantSavedImage {
                                 override fun onSaved(uri: String) {
@@ -185,11 +203,17 @@ class AcuantFaceCaptureFragment: AcuantBaseFaceCameraFragment() {
 
     override fun buildImageAnalyzer(screenAspectRatio: Int, rotation: Int) {
         val frameAnalyzer = try {
-                FaceFrameAnalyzer { boundingBox, state ->
-                    onFaceDetected(boundingBox, state)
-                }
+            FaceFrameAnalyzer { boundingBox, state ->
+                onFaceDetected(boundingBox, state)
+            }
         } catch (e: IllegalStateException) {
-            cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_UnexpectedError, ErrorDescriptions.ERROR_DESC_UnexpectedError, e.toString()))
+            cameraActivityListener.onError(
+                AcuantError(
+                    ErrorCodes.ERROR_UnexpectedError,
+                    ErrorDescriptions.ERROR_DESC_UnexpectedError,
+                    e.toString()
+                )
+            )
             return
         }
 
@@ -212,7 +236,8 @@ class AcuantFaceCaptureFragment: AcuantBaseFaceCameraFragment() {
         }
 
 
-        @JvmStatic fun newInstance(acuantOptions: FaceCaptureOptions): AcuantFaceCaptureFragment {
+        @JvmStatic
+        fun newInstance(acuantOptions: FaceCaptureOptions): AcuantFaceCaptureFragment {
             val frag = AcuantFaceCaptureFragment()
             val args = Bundle()
             args.putSerializable(INTERNAL_OPTIONS, acuantOptions)

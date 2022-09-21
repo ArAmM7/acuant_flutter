@@ -8,6 +8,8 @@ import android.graphics.Point
 import android.os.Bundle
 import android.util.Log
 import android.view.*
+import android.view.animation.AlphaAnimation
+import android.view.animation.Animation
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.core.impl.utils.Exif
@@ -51,14 +53,70 @@ abstract class AcuantBaseCameraFragment : Fragment() {
     protected lateinit var cameraActivityListener: ICameraActivityFinish
     protected lateinit var acuantOptions: AcuantCameraOptions
 
+    private fun View.blink(
+        times: Int = Animation.INFINITE,
+        duration: Long = 400L,
+        offset: Long = 0L,
+        minAlpha: Float = 0.2f,
+        maxAlpha: Float = 1.0f,
+        repeatMode: Int = Animation.REVERSE
+    ) {
+        startAnimation(AlphaAnimation(minAlpha, maxAlpha).also {
+            it.duration = duration
+            it.startOffset = offset
+            it.repeatMode = repeatMode
+            it.repeatCount = times
+        })
+
+
+    }
+
+    private fun showFocus() {
+        hideLoading()
+        hideUi()
+        if (fragmentCameraBinding?.focusIndicator?.visibility != View.VISIBLE) {
+            fragmentCameraBinding?.focusIndicator?.visibility = View.VISIBLE
+            fragmentCameraBinding?.focusIndicator?.blink()
+        }
+    }
+
+    private fun hideFocus() {
+        if (fragmentCameraBinding?.focusIndicator?.visibility != View.INVISIBLE) {
+            fragmentCameraBinding?.focusIndicator?.clearAnimation()
+            fragmentCameraBinding?.focusIndicator?.visibility = View.INVISIBLE
+        }
+    }
+
     private fun showLoading() {
-        fragmentCameraBinding?.uiHolder?.visibility = View.INVISIBLE
-        fragmentCameraBinding?.progressIndicator?.visibility = View.VISIBLE
+        hideFocus()
+        hideUi()
+        if (fragmentCameraBinding?.progressIndicator?.visibility != View.VISIBLE) {
+            fragmentCameraBinding?.progressIndicator?.visibility = View.VISIBLE
+        }
     }
 
     private fun hideLoading() {
-        fragmentCameraBinding?.uiHolder?.visibility = View.VISIBLE
-        fragmentCameraBinding?.progressIndicator?.visibility = View.GONE
+        if (fragmentCameraBinding?.progressIndicator?.visibility != View.INVISIBLE) {
+            fragmentCameraBinding?.progressIndicator?.visibility = View.INVISIBLE
+        }
+    }
+
+    private fun hideUi() {
+        if (fragmentCameraBinding?.uiHolder?.visibility != View.INVISIBLE) {
+            fragmentCameraBinding?.uiHolder?.visibility = View.INVISIBLE
+        }
+    }
+
+    private fun showUi() {
+        if (fragmentCameraBinding?.uiHolder?.visibility != View.VISIBLE) {
+            fragmentCameraBinding?.uiHolder?.visibility = View.VISIBLE
+        }
+    }
+
+    private fun hideAll() {
+        hideFocus()
+        hideLoading()
+        showUi()
     }
 
     private val permissionRequest = registerForActivityResult(
@@ -125,7 +183,7 @@ abstract class AcuantBaseCameraFragment : Fragment() {
     override fun onPause() {
         if (!fullyDone) {
             capturing = false
-            hideLoading()
+            hideAll()
             resetWorkflow()
         }
         super.onPause()
@@ -334,7 +392,7 @@ abstract class AcuantBaseCameraFragment : Fragment() {
     ) {
         if (!capturing) {
             capturing = true
-            showLoading();
+            showFocus()
             if (!failedToFocus) {
                 val width = fragmentCameraBinding?.root?.width?.toFloat()
                 val height = fragmentCameraBinding?.root?.height?.toFloat()
@@ -360,13 +418,13 @@ abstract class AcuantBaseCameraFragment : Fragment() {
                             } else {
                                 failedToFocus = true
                                 capturing = false
-                                hideLoading()
+                                hideAll()
                                 resetWorkflow()
                             }
                         } catch (e: Exception) {
                             failedToFocus = true
                             capturing = false
-                            hideLoading()
+                            hideAll()
                             resetWorkflow()
                         }
                     }, ContextCompat.getMainExecutor(requireContext()))
@@ -400,7 +458,7 @@ abstract class AcuantBaseCameraFragment : Fragment() {
             val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
 
             // Setup image capture listener which is triggered after photo has been taken
-
+            showLoading()
             imageCapture.takePicture(
                 outputOptions,
                 cameraExecutor,

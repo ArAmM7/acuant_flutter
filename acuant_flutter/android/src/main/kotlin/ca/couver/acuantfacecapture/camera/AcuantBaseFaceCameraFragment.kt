@@ -11,6 +11,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AlphaAnimation
+import android.view.animation.Animation
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.core.impl.utils.Exif
@@ -86,6 +88,7 @@ abstract class AcuantBaseFaceCameraFragment : Fragment() {
 
     override fun onPause() {
         capturing = false
+        hideAll()
         resetWorkflow()
         super.onPause()
     }
@@ -99,12 +102,32 @@ abstract class AcuantBaseFaceCameraFragment : Fragment() {
         super.onDestroyView()
     }
 
+    private fun View.blink(
+        times: Int = Animation.INFINITE,
+        duration: Long = 400L,
+        offset: Long = 0L,
+        minAlpha: Float = 0.2f,
+        maxAlpha: Float = 1.0f,
+        repeatMode: Int = Animation.REVERSE
+    ) {
+        startAnimation(AlphaAnimation(minAlpha, maxAlpha).also {
+            it.duration = duration
+            it.startOffset = offset
+            it.repeatMode = repeatMode
+            it.repeatCount = times
+        })
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
         fragmentCameraBinding = FragmentFaceCameraBinding.inflate(inflater, container, false)
+        fragmentCameraBinding?.backButton?.setOnClickListener {
+            cameraActivityListener.onCancel()
+        }
+//        fragmentCameraBinding?.focusIndicator?.blink()
         return fragmentCameraBinding!!.root
     }
 
@@ -279,27 +302,114 @@ abstract class AcuantBaseFaceCameraFragment : Fragment() {
 
     abstract fun buildImageAnalyzer(screenAspectRatio: Int, rotation: Int)
 
-//    var progress: ProgressDialog? = null;
+    fun showBlink() {
+        hideFocus()
+        if (fragmentCameraBinding?.blinkIndicator?.visibility == View.INVISIBLE) {
+            fragmentCameraBinding?.blinkIndicator?.visibility = View.VISIBLE
+            fragmentCameraBinding?.blinkIndicator?.blink()
+        }
+    }
+
+    fun hideBlink() {
+        if (fragmentCameraBinding?.blinkIndicator?.visibility != View.INVISIBLE) {
+            fragmentCameraBinding?.blinkIndicator?.clearAnimation()
+            fragmentCameraBinding?.blinkIndicator?.visibility = View.INVISIBLE
+        }
+    }
+
+    private fun showFocus() {
+        hideBlink()
+        if (fragmentCameraBinding?.focusIndicator?.visibility == View.INVISIBLE) {
+            fragmentCameraBinding?.focusIndicator?.visibility = View.VISIBLE
+            fragmentCameraBinding?.focusIndicator?.blink()
+        }
+    }
+
+    private fun hideFocus() {
+        if (fragmentCameraBinding?.focusIndicator?.visibility != View.INVISIBLE) {
+            fragmentCameraBinding?.focusIndicator?.clearAnimation()
+            fragmentCameraBinding?.focusIndicator?.visibility = View.INVISIBLE
+        }
+    }
 
 //    fun showLoading() {
-//        progress = ProgressDialog(activity)
-//        progress!!.setTitle("Processing")
-//        progress!!.setMessage("Wait while preparing image...")
-//        progress!!.setCancelable(false)
-//        progress!!.show()
+//        hideFocus()
+//        fragmentCameraBinding?.progressIndicator?.visibility = View.VISIBLE
 //    }
 
-//    fun hideLoading() {
-//        progress?.hide()
-//        progress = null
+//    private fun hideLoading() {
+//        fragmentCameraBinding?.progressIndicator?.visibility = View.INVISIBLE
 //    }
+
+    private fun hideAll() {
+        hideFocus()
+        hideBlink()
+//        hideLoading()
+    }
+
+    @SuppressLint("RestrictedApi")
+    fun handleOnImageSaved(
+        outputFileResults: ImageCapture.OutputFileResults,
+        photoFile: File,
+        listener: IAcuantSavedImage
+    ) {
+        var savedUri =
+            outputFileResults.savedUri?.path ?: photoFile.absolutePath
+
+        val file = File(savedUri)
+        val exif = Exif.createFromFile(file)
+        val rotation = exif.rotation
+
+        val inStream = file.inputStream()
+        var bmp: Bitmap = BitmapFactory.decodeStream(inStream)
+
+
+        if (rotation != 0) {
+            val matrix = Matrix()
+            matrix.postRotate(rotation.toFloat())
+            bmp = Bitmap.createBitmap(
+                bmp,
+                0,
+                0,
+                bmp.width,
+                bmp.height,
+                matrix,
+                true
+            )
+        }
+
+        bmp = AcuantImagePreparation.resize(bmp, 720) ?: bmp
+
+        inStream.close()
+
+        var fOut: FileOutputStream? = null
+        try {
+            val newPhotoFile =
+                File.createTempFile(
+                    "AcuantCameraImage",
+                    ".jpg",
+                    requireActivity().cacheDir
+                )
+            fOut = newPhotoFile.outputStream()
+            bmp.compress(Bitmap.CompressFormat.JPEG, 100, fOut)
+            file.delete()
+            savedUri = newPhotoFile.absolutePath
+        } catch (e1: FileNotFoundException) {
+            e1.printStackTrace()
+        } catch (e: IOException) {
+            e.printStackTrace()
+        } finally {
+            fOut?.flush()
+            fOut?.close()
+        }
+        listener.onSaved(savedUri)
+    }
 
     fun captureImage(listener: IAcuantSavedImage) {
         if (!capturing) {
-//            showLoading()
             imageCapture?.let { imageCapture ->
                 capturing = true
-
+                showFocus()
                 // Create output file to hold the image (will automatically add numbers to create a uuid)
                 val photoFile =
                     File.createTempFile("AcuantCameraImage", ".jpg", requireActivity().cacheDir)
@@ -312,59 +422,8 @@ abstract class AcuantBaseFaceCameraFragment : Fragment() {
                     outputOptions,
                     cameraExecutor,
                     object : ImageCapture.OnImageSavedCallback {
-                        @SuppressLint("RestrictedApi")
                         override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-
-                            var savedUri =
-                                outputFileResults.savedUri?.path ?: photoFile.absolutePath
-
-                            val file = File(savedUri)
-                            val exif = Exif.createFromFile(file)
-                            val rotation = exif.rotation
-
-                            val inStream = file.inputStream()
-                            var bmp: Bitmap = BitmapFactory.decodeStream(inStream)
-
-
-                            if (rotation != 0) {
-                                val matrix = Matrix()
-                                matrix.postRotate(rotation.toFloat())
-                                bmp = Bitmap.createBitmap(
-                                    bmp,
-                                    0,
-                                    0,
-                                    bmp.width,
-                                    bmp.height,
-                                    matrix,
-                                    true
-                                )
-                            }
-
-                            bmp = AcuantImagePreparation.resize(bmp, 720) ?: bmp
-
-                            inStream.close()
-
-                            var fOut: FileOutputStream? = null
-                            try {
-                                val newPhotoFile =
-                                    File.createTempFile(
-                                        "AcuantCameraImage",
-                                        ".jpg",
-                                        requireActivity().cacheDir
-                                    )
-                                fOut = newPhotoFile.outputStream()
-                                bmp.compress(Bitmap.CompressFormat.JPEG, 100, fOut)
-                                file.delete()
-                                savedUri = newPhotoFile.absolutePath
-                            } catch (e1: FileNotFoundException) {
-                                e1.printStackTrace()
-                            } catch (e: IOException) {
-                                e.printStackTrace()
-                            } finally {
-                                fOut?.flush()
-                                fOut?.close()
-                            }
-                            listener.onSaved(savedUri)
+                            handleOnImageSaved(outputFileResults, photoFile, listener)
                         }
 
                         override fun onError(exception: ImageCaptureException) {

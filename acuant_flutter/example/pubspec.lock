@@ -9,11 +9,11 @@ packages:
     source: path
     version: "0.0.1"
   acuant_platform_interface:
-    dependency: "direct main"
+    dependency: transitive
     description:
-      path: "../../acuant_platform_interface"
-      relative: true
-    source: path
+      name: acuant_platform_interface
+      url: "https://pub.dartlang.org"
+    source: hosted
     version: "0.0.1"
   async:
     dependency: transitive
