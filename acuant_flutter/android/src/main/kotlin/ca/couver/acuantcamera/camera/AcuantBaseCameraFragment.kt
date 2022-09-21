@@ -14,6 +14,7 @@ import androidx.camera.core.impl.utils.Exif
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
+import androidx.core.view.children
 import androidx.exifinterface.media.ExifInterface
 import androidx.fragment.app.Fragment
 import ca.couver.acuant.databinding.FragmentCameraBinding
@@ -32,7 +33,7 @@ import java.util.concurrent.Executors
 import ca.couver.acuant.R
 
 
-abstract class AcuantBaseCameraFragment: Fragment() {
+abstract class AcuantBaseCameraFragment : Fragment() {
 
     private var displayId: Int = -1
     private var lensFacing: Int = CameraSelector.LENS_FACING_BACK
@@ -50,6 +51,16 @@ abstract class AcuantBaseCameraFragment: Fragment() {
     protected lateinit var cameraActivityListener: ICameraActivityFinish
     protected lateinit var acuantOptions: AcuantCameraOptions
 
+    private fun showLoading() {
+        fragmentCameraBinding?.uiHolder?.visibility = View.INVISIBLE
+        fragmentCameraBinding?.progressIndicator?.visibility = View.VISIBLE
+    }
+
+    private fun hideLoading() {
+        fragmentCameraBinding?.uiHolder?.visibility = View.VISIBLE
+        fragmentCameraBinding?.progressIndicator?.visibility = View.GONE
+    }
+
     private val permissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -59,11 +70,21 @@ abstract class AcuantBaseCameraFragment: Fragment() {
             val alertDialog = AlertDialog.Builder(requireContext()).create()
             alertDialog.setMessage(getString(R.string.no_camera_permission))
             alertDialog.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.ok)) { _, _ ->
-                cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_Permissions, ErrorDescriptions.ERROR_DESC_Permissions))
+                cameraActivityListener.onError(
+                    AcuantError(
+                        ErrorCodes.ERROR_Permissions,
+                        ErrorDescriptions.ERROR_DESC_Permissions
+                    )
+                )
                 alertDialog.dismiss()
             }
             alertDialog.setOnCancelListener {
-                cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_Permissions, ErrorDescriptions.ERROR_DESC_Permissions))
+                cameraActivityListener.onError(
+                    AcuantError(
+                        ErrorCodes.ERROR_Permissions,
+                        ErrorDescriptions.ERROR_DESC_Permissions
+                    )
+                )
                 alertDialog.dismiss()
             }
             alertDialog.show()
@@ -85,6 +106,9 @@ abstract class AcuantBaseCameraFragment: Fragment() {
         savedInstanceState: Bundle?
     ): View {
         fragmentCameraBinding = FragmentCameraBinding.inflate(inflater, container, false)
+        fragmentCameraBinding?.backButton?.setOnClickListener {
+            cameraActivityListener.onCancel()
+        }
         return fragmentCameraBinding!!.root
     }
 
@@ -101,6 +125,7 @@ abstract class AcuantBaseCameraFragment: Fragment() {
     override fun onPause() {
         if (!fullyDone) {
             capturing = false
+            hideLoading()
             resetWorkflow()
         }
         super.onPause()
@@ -117,7 +142,13 @@ abstract class AcuantBaseCameraFragment: Fragment() {
         if (opts != null) {
             acuantOptions = opts
         } else {
-            cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_UnexpectedError, ErrorDescriptions.ERROR_DESC_UnexpectedError, "Options were unexpectedly null"))
+            cameraActivityListener.onError(
+                AcuantError(
+                    ErrorCodes.ERROR_UnexpectedError,
+                    ErrorDescriptions.ERROR_DESC_UnexpectedError,
+                    "Options were unexpectedly null"
+                )
+            )
             return
         }
 
@@ -153,7 +184,8 @@ abstract class AcuantBaseCameraFragment: Fragment() {
 
             if (binding != null) {
                 if (acuantOptions.zoomType == AcuantCameraOptions.ZoomType.IdOnly) {
-                    (binding.viewFinder.layoutParams as ConstraintLayout.LayoutParams?)?.dimensionRatio = ""
+                    (binding.viewFinder.layoutParams as ConstraintLayout.LayoutParams?)?.dimensionRatio =
+                        ""
                 }
                 // Keep track of the display in which this view is attached
                 displayId = binding.viewFinder.display.displayId
@@ -166,7 +198,11 @@ abstract class AcuantBaseCameraFragment: Fragment() {
     abstract fun rotateUi(rotation: Int)
 
     private fun requestCameraPermissionIfNeeded() {
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.CAMERA
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             if (shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
                 val alertDialog = AlertDialog.Builder(requireContext()).create()
                 alertDialog.setMessage(getString(R.string.cam_perm_request_text))
@@ -196,7 +232,13 @@ abstract class AcuantBaseCameraFragment: Fragment() {
             lensFacing = when {
                 hasBackCamera() -> CameraSelector.LENS_FACING_BACK
                 else -> {
-                    cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_UnexpectedError, ErrorDescriptions.ERROR_DESC_UnexpectedError, "Phone does not have a camera/app can not see the camera"))
+                    cameraActivityListener.onError(
+                        AcuantError(
+                            ErrorCodes.ERROR_UnexpectedError,
+                            ErrorDescriptions.ERROR_DESC_UnexpectedError,
+                            "Phone does not have a camera/app can not see the camera"
+                        )
+                    )
                     return@addListener
                 }
             }
@@ -220,7 +262,13 @@ abstract class AcuantBaseCameraFragment: Fragment() {
         val cameraProvider = cameraProvider
 
         if (cameraProvider == null) {
-            cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_UnexpectedError, ErrorDescriptions.ERROR_DESC_UnexpectedError, "Camera initialization failed."))
+            cameraActivityListener.onError(
+                AcuantError(
+                    ErrorCodes.ERROR_UnexpectedError,
+                    ErrorDescriptions.ERROR_DESC_UnexpectedError,
+                    "Camera initialization failed."
+                )
+            )
             return
         }
 
@@ -248,7 +296,8 @@ abstract class AcuantBaseCameraFragment: Fragment() {
             .setTargetRotation(rotation)
             .build()
 
-        val trueScreenRatio = fragmentCameraBinding!!.viewFinder.height / fragmentCameraBinding!!.viewFinder.width.toFloat()
+        val trueScreenRatio =
+            fragmentCameraBinding!!.viewFinder.height / fragmentCameraBinding!!.viewFinder.width.toFloat()
 
         buildImageAnalyzer(screenAspectRatio, trueScreenRatio, rotation)
 
@@ -256,13 +305,15 @@ abstract class AcuantBaseCameraFragment: Fragment() {
         cameraProvider.unbindAll()
 
         try {
-            val useCaseGroupBuilder = UseCaseGroup.Builder().addUseCase(preview!!).addUseCase(imageCapture!!)
+            val useCaseGroupBuilder =
+                UseCaseGroup.Builder().addUseCase(preview!!).addUseCase(imageCapture!!)
 
             if (imageAnalyzer != null) {
                 useCaseGroupBuilder.addUseCase(imageAnalyzer!!)
             }
 
-            camera = cameraProvider.bindToLifecycle(this, cameraSelector, useCaseGroupBuilder.build())
+            camera =
+                cameraProvider.bindToLifecycle(this, cameraSelector, useCaseGroupBuilder.build())
 
             // Attach the viewfinder's surface provider to preview use case
             preview?.setSurfaceProvider(fragmentCameraBinding!!.viewFinder.surfaceProvider)
@@ -276,9 +327,14 @@ abstract class AcuantBaseCameraFragment: Fragment() {
 
     abstract fun resetWorkflow()
 
-    fun captureImage (listener: IAcuantSavedImage, middle: Point? = null, captureType: String? = null) {
+    fun captureImage(
+        listener: IAcuantSavedImage,
+        middle: Point? = null,
+        captureType: String? = null
+    ) {
         if (!capturing) {
             capturing = true
+            showLoading();
             if (!failedToFocus) {
                 val width = fragmentCameraBinding?.root?.width?.toFloat()
                 val height = fragmentCameraBinding?.root?.height?.toFloat()
@@ -304,11 +360,13 @@ abstract class AcuantBaseCameraFragment: Fragment() {
                             } else {
                                 failedToFocus = true
                                 capturing = false
+                                hideLoading()
                                 resetWorkflow()
                             }
                         } catch (e: Exception) {
                             failedToFocus = true
                             capturing = false
+                            hideLoading()
                             resetWorkflow()
                         }
                     }, ContextCompat.getMainExecutor(requireContext()))
@@ -342,10 +400,12 @@ abstract class AcuantBaseCameraFragment: Fragment() {
             val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
 
             // Setup image capture listener which is triggered after photo has been taken
+
             imageCapture.takePicture(
                 outputOptions,
                 cameraExecutor,
                 object : ImageCapture.OnImageSavedCallback {
+
                     @SuppressLint("RestrictedApi")
                     override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
 
@@ -357,7 +417,11 @@ abstract class AcuantBaseCameraFragment: Fragment() {
                         if (captureType != null) {
                             addExif(File(savedUri), captureType, rotation)
                         } else {
-                            addExif(File(savedUri), "NOT SPECIFIED (implementer used deprecated constructor that lacks this data)", rotation)
+                            addExif(
+                                File(savedUri),
+                                "NOT SPECIFIED (implementer used deprecated constructor that lacks this data)",
+                                rotation
+                            )
                         }
 
                         fullyDone = true
@@ -401,36 +465,42 @@ abstract class AcuantBaseCameraFragment: Fragment() {
                     // Open errors
                     CameraState.ERROR_STREAM_CONFIG -> {
                         // Make sure to setup the use cases properly
-                            "Stream config error"
+                        "Stream config error"
                     }
                     // Opening errors
                     CameraState.ERROR_CAMERA_IN_USE -> {
                         // Close the camera or ask user to close another camera app that's using the
                         // camera
-                            "Camera in use"
+                        "Camera in use"
                     }
                     CameraState.ERROR_MAX_CAMERAS_IN_USE -> {
                         // Close another open camera in the app, or ask the user to close another
                         // camera app that's using the camera
-                            "Max cameras in use"
+                        "Max cameras in use"
                     }
                     // Closing errors
                     CameraState.ERROR_CAMERA_DISABLED -> {
                         // Ask the user to enable the device's cameras
-                            "Camera disabled"
+                        "Camera disabled"
                     }
                     CameraState.ERROR_CAMERA_FATAL_ERROR -> {
                         // Ask the user to reboot the device to restore camera function
-                            "Fatal error"
+                        "Fatal error"
                     }
                     // Closed errors
                     CameraState.ERROR_DO_NOT_DISTURB_MODE_ENABLED -> {
                         // Ask the user to disable the "Do Not Disturb" mode, then reopen the camera
-                            "Do not disturb mode enabled"
+                        "Do not disturb mode enabled"
                     }
                     else -> null
                 }
-                cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_UnexpectedError, ErrorDescriptions.ERROR_DESC_UnexpectedError, text))
+                cameraActivityListener.onError(
+                    AcuantError(
+                        ErrorCodes.ERROR_UnexpectedError,
+                        ErrorDescriptions.ERROR_DESC_UnexpectedError,
+                        text
+                    )
+                )
             }
         }
     }
@@ -443,7 +513,10 @@ abstract class AcuantBaseCameraFragment: Fragment() {
         setOnTouchListener { v, event ->
             if (event.action == MotionEvent.ACTION_DOWN) {
                 v.getLocationOnScreen(screenPosition)
-                coordinates.set(event.x.toInt() + screenPosition[0], event.y.toInt() + screenPosition[1])
+                coordinates.set(
+                    event.x.toInt() + screenPosition[0],
+                    event.y.toInt() + screenPosition[1]
+                )
             }
 //            v.performClick()
             false
@@ -466,8 +539,14 @@ abstract class AcuantBaseCameraFragment: Fragment() {
             json.put(AcuantImagePreparation.ROTATION_TAG, rotation)
 
             when (rotation) {
-                270 ->  exif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_ROTATE_270.toString())
-                else -> exif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_ROTATE_90.toString())
+                270 -> exif.setAttribute(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_ROTATE_270.toString()
+                )
+                else -> exif.setAttribute(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_ROTATE_90.toString()
+                )
             }
 
             exif.setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, json.toString())
@@ -476,7 +555,7 @@ abstract class AcuantBaseCameraFragment: Fragment() {
 
         //we currently want all doc cameras to be in 4:3 to use as much of the available camera space as possible
         private fun aspectRatio(): Int {
-                return AspectRatio.RATIO_4_3
+            return AspectRatio.RATIO_4_3
         }
     }
 }

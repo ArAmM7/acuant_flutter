@@ -42,7 +42,7 @@ abstract class BaseRectangleView(context: Context, attr: AttributeSet?) : View(c
     /**
      * Color that the paint is set to when the card is not aligned
      */
-    internal var paintColorAlign = Color.BLACK
+    internal var paintColorAlign = Color.WHITE
     /**
      * Color that the paint is set to when the card is aligned but too far
      */
@@ -80,7 +80,7 @@ abstract class BaseRectangleView(context: Context, attr: AttributeSet?) : View(c
     /**
      * Color that the bracket paint is set to when the card is not aligned
      */
-    var paintColorBracketAlign = Color.BLACK
+    var paintColorBracketAlign = Color.WHITE
     /**
      * Color that the bracket paint is set to when the card is aligned but too far
      */

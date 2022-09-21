@@ -8,21 +8,23 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.os.Bundle
-import android.view.*
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.core.impl.utils.Exif
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import ca.couver.acuant.R
+import ca.couver.acuant.databinding.FragmentFaceCameraBinding
+import ca.couver.acuantfacecapture.interfaces.IAcuantSavedImage
+import ca.couver.acuantfacecapture.interfaces.IFaceCameraActivityFinish
+import ca.couver.acuantfacecapture.model.FaceCaptureOptions
 import com.acuant.acuantcommon.model.AcuantError
 import com.acuant.acuantcommon.model.ErrorCodes
 import com.acuant.acuantcommon.model.ErrorDescriptions
-import ca.couver.acuant.databinding.FragmentFaceCameraBinding
-import ca.couver.acuantfacecapture.interfaces.IFaceCameraActivityFinish
-import ca.couver.acuantfacecapture.model.FaceCaptureOptions
-import ca.couver.acuant.R
-import ca.couver.acuantfacecapture.interfaces.IAcuantSavedImage
 import com.acuant.acuantimagepreparation.AcuantImagePreparation
 import java.io.File
 import java.io.FileNotFoundException
@@ -35,7 +37,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 
-abstract class AcuantBaseFaceCameraFragment: Fragment() {
+abstract class AcuantBaseFaceCameraFragment : Fragment() {
 
     private var displayId: Int = -1
     private var lensFacing: Int = CameraSelector.LENS_FACING_FRONT
@@ -59,11 +61,21 @@ abstract class AcuantBaseFaceCameraFragment: Fragment() {
             val alertDialog = AlertDialog.Builder(requireContext()).create()
             alertDialog.setMessage(getString(R.string.no_camera_permission))
             alertDialog.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.ok)) { _, _ ->
-                cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_Permissions, ErrorDescriptions.ERROR_DESC_Permissions))
+                cameraActivityListener.onError(
+                    AcuantError(
+                        ErrorCodes.ERROR_Permissions,
+                        ErrorDescriptions.ERROR_DESC_Permissions
+                    )
+                )
                 alertDialog.dismiss()
             }
             alertDialog.setOnCancelListener {
-                cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_Permissions, ErrorDescriptions.ERROR_DESC_Permissions))
+                cameraActivityListener.onError(
+                    AcuantError(
+                        ErrorCodes.ERROR_Permissions,
+                        ErrorDescriptions.ERROR_DESC_Permissions
+                    )
+                )
                 alertDialog.dismiss()
             }
             alertDialog.show()
@@ -107,7 +119,13 @@ abstract class AcuantBaseFaceCameraFragment: Fragment() {
         if (opts != null) {
             acuantOptions = opts
         } else {
-            cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_UnexpectedError, ErrorDescriptions.ERROR_DESC_UnexpectedError, "Options were unexpectedly null"))
+            cameraActivityListener.onError(
+                AcuantError(
+                    ErrorCodes.ERROR_UnexpectedError,
+                    ErrorDescriptions.ERROR_DESC_UnexpectedError,
+                    "Options were unexpectedly null"
+                )
+            )
             return
         }
 
@@ -122,13 +140,17 @@ abstract class AcuantBaseFaceCameraFragment: Fragment() {
                 // Keep track of the display in which this view is attached
                 displayId = binding.viewFinder.display.displayId
 
-                requestCameraPermissionIfNeeded ()
+                requestCameraPermissionIfNeeded()
             }
         }
     }
 
     private fun requestCameraPermissionIfNeeded() {
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.CAMERA
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             if (shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
                 val alertDialog = AlertDialog.Builder(requireContext()).create()
                 alertDialog.setMessage(getString(R.string.cam_perm_request_text))
@@ -158,7 +180,13 @@ abstract class AcuantBaseFaceCameraFragment: Fragment() {
             lensFacing = when {
                 hasBackCamera() -> CameraSelector.LENS_FACING_FRONT
                 else -> {
-                    cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_UnexpectedError, ErrorDescriptions.ERROR_DESC_UnexpectedError, "Phone does not have a camera/app can not see the camera"))
+                    cameraActivityListener.onError(
+                        AcuantError(
+                            ErrorCodes.ERROR_UnexpectedError,
+                            ErrorDescriptions.ERROR_DESC_UnexpectedError,
+                            "Phone does not have a camera/app can not see the camera"
+                        )
+                    )
                     return@addListener
                 }
             }
@@ -185,7 +213,13 @@ abstract class AcuantBaseFaceCameraFragment: Fragment() {
         val cameraProvider = cameraProvider
 
         if (cameraProvider == null) {
-            cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_UnexpectedError, ErrorDescriptions.ERROR_DESC_UnexpectedError, "Camera initialization failed."))
+            cameraActivityListener.onError(
+                AcuantError(
+                    ErrorCodes.ERROR_UnexpectedError,
+                    ErrorDescriptions.ERROR_DESC_UnexpectedError,
+                    "Camera initialization failed."
+                )
+            )
             return
         }
 
@@ -221,24 +255,48 @@ abstract class AcuantBaseFaceCameraFragment: Fragment() {
             // camera provides access to CameraControl & CameraInfo
             camera = if (imageAnalyzer == null) {
                 cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageCapture)
+                    this, cameraSelector, preview, imageCapture
+                )
             } else {
                 cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageCapture, imageAnalyzer)
+                    this, cameraSelector, preview, imageCapture, imageAnalyzer
+                )
             }
 
             // Attach the viewfinder's surface provider to preview use case
             preview?.setSurfaceProvider(fragmentCameraBinding!!.viewFinder.surfaceProvider)
             observeCameraState(camera?.cameraInfo!!)
         } catch (exc: Exception) {
-            cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_UnexpectedError, ErrorDescriptions.ERROR_DESC_UnexpectedError, exc.toString()))
+            cameraActivityListener.onError(
+                AcuantError(
+                    ErrorCodes.ERROR_UnexpectedError,
+                    ErrorDescriptions.ERROR_DESC_UnexpectedError,
+                    exc.toString()
+                )
+            )
         }
     }
 
     abstract fun buildImageAnalyzer(screenAspectRatio: Int, rotation: Int)
 
-    fun captureImage (listener: IAcuantSavedImage) {
+//    var progress: ProgressDialog? = null;
+
+//    fun showLoading() {
+//        progress = ProgressDialog(activity)
+//        progress!!.setTitle("Processing")
+//        progress!!.setMessage("Wait while preparing image...")
+//        progress!!.setCancelable(false)
+//        progress!!.show()
+//    }
+
+//    fun hideLoading() {
+//        progress?.hide()
+//        progress = null
+//    }
+
+    fun captureImage(listener: IAcuantSavedImage) {
         if (!capturing) {
+//            showLoading()
             imageCapture?.let { imageCapture ->
                 capturing = true
 
@@ -257,30 +315,43 @@ abstract class AcuantBaseFaceCameraFragment: Fragment() {
                         @SuppressLint("RestrictedApi")
                         override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
 
-                            var savedUri = outputFileResults.savedUri?.path ?: photoFile.absolutePath
+                            var savedUri =
+                                outputFileResults.savedUri?.path ?: photoFile.absolutePath
 
                             val file = File(savedUri)
                             val exif = Exif.createFromFile(file)
                             val rotation = exif.rotation
 
-                            val instream = file.inputStream()
-                            var bmp: Bitmap = BitmapFactory.decodeStream(instream)
+                            val inStream = file.inputStream()
+                            var bmp: Bitmap = BitmapFactory.decodeStream(inStream)
 
 
                             if (rotation != 0) {
                                 val matrix = Matrix()
                                 matrix.postRotate(rotation.toFloat())
-                                bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
+                                bmp = Bitmap.createBitmap(
+                                    bmp,
+                                    0,
+                                    0,
+                                    bmp.width,
+                                    bmp.height,
+                                    matrix,
+                                    true
+                                )
                             }
 
                             bmp = AcuantImagePreparation.resize(bmp, 720) ?: bmp
 
-                            instream.close()
+                            inStream.close()
 
                             var fOut: FileOutputStream? = null
                             try {
                                 val newPhotoFile =
-                                    File.createTempFile("AcuantCameraImage", ".jpg", requireActivity().cacheDir)
+                                    File.createTempFile(
+                                        "AcuantCameraImage",
+                                        ".jpg",
+                                        requireActivity().cacheDir
+                                    )
                                 fOut = newPhotoFile.outputStream()
                                 bmp.compress(Bitmap.CompressFormat.JPEG, 100, fOut)
                                 file.delete()
@@ -293,7 +364,6 @@ abstract class AcuantBaseFaceCameraFragment: Fragment() {
                                 fOut?.flush()
                                 fOut?.close()
                             }
-
                             listener.onSaved(savedUri)
                         }
 
@@ -318,36 +388,42 @@ abstract class AcuantBaseFaceCameraFragment: Fragment() {
                     // Open errors
                     CameraState.ERROR_STREAM_CONFIG -> {
                         // Make sure to setup the use cases properly
-                            "Stream config error"
+                        "Stream config error"
                     }
                     // Opening errors
                     CameraState.ERROR_CAMERA_IN_USE -> {
                         // Close the camera or ask user to close another camera app that's using the
                         // camera
-                            "Camera in use"
+                        "Camera in use"
                     }
                     CameraState.ERROR_MAX_CAMERAS_IN_USE -> {
                         // Close another open camera in the app, or ask the user to close another
                         // camera app that's using the camera
-                            "Max cameras in use"
+                        "Max cameras in use"
                     }
                     // Closing errors
                     CameraState.ERROR_CAMERA_DISABLED -> {
                         // Ask the user to enable the device's cameras
-                            "Camera disabled"
+                        "Camera disabled"
                     }
                     CameraState.ERROR_CAMERA_FATAL_ERROR -> {
                         // Ask the user to reboot the device to restore camera function
-                            "Fatal error"
+                        "Fatal error"
                     }
                     // Closed errors
                     CameraState.ERROR_DO_NOT_DISTURB_MODE_ENABLED -> {
                         // Ask the user to disable the "Do Not Disturb" mode, then reopen the camera
-                            "Do not disturb mode enabled"
+                        "Do not disturb mode enabled"
                     }
                     else -> null
                 }
-                cameraActivityListener.onError(AcuantError(ErrorCodes.ERROR_UnexpectedError, ErrorDescriptions.ERROR_DESC_UnexpectedError, text))
+                cameraActivityListener.onError(
+                    AcuantError(
+                        ErrorCodes.ERROR_UnexpectedError,
+                        ErrorDescriptions.ERROR_DESC_UnexpectedError,
+                        text
+                    )
+                )
             }
         }
     }

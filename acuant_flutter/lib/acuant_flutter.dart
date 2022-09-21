@@ -8,44 +8,14 @@
 // import 'acuant_flutter_platform_interface.dart';
 library acuant_flutter;
 
-import 'dart:typed_data';
-
 import 'package:acuant_platform_interface/acuant_platform_interface.dart';
 
-class AcuantImage {
-  const AcuantImage({
-    required this.rawBytes,
-    required this.aspectRatio,
-    required this.dpi,
-    required this.glare,
-    required this.isCorrectAspectRatio,
-    required this.isPassport,
-    required this.sharpness,
-  });
-  final Uint8List rawBytes;
-  final double aspectRatio;
-  final int dpi;
-  final int glare;
-  final bool isCorrectAspectRatio;
-  final bool isPassport;
-  final int sharpness;
+import 'source/acuant_face_image.dart';
+import 'source/acuant_document_image.dart';
 
-  static AcuantImage? fromMap(Map data) {
-    try {
-      return AcuantImage(
-        rawBytes: data["RAW_BYTES"],
-        aspectRatio: data["ASPECT_RATIO"],
-        dpi: data["DPI"],
-        glare: data["GLARE"],
-        isCorrectAspectRatio: data["IS_CORRECT_ASPECT_RATIO"],
-        isPassport: data["IS_PASSPORT"],
-        sharpness: data["SHARPNESS"],
-      );
-    } catch (e) {
-      return null;
-    }
-  }
-}
+export 'source/acuant_face_image.dart';
+export 'source/acuant_document_image.dart';
+export 'source/enums.dart';
 
 class Acuant {
   Acuant._();
@@ -67,23 +37,19 @@ class Acuant {
     );
   }
 
-  Future<AcuantImage?> showDocumentCamera() async {
+  Future<AcuantDocumentImage?> showDocumentCamera() async {
     final res = await AcuantPlatform.instance.showDocumentCamera();
     if (res is Map) {
-      return AcuantImage.fromMap(res);
+      return AcuantDocumentImage.fromMap(res);
     }
     return null;
   }
 
-  Future<AcuantImage?> showFaceCamera() async {
+  Future<AcuantFaceImage?> showFaceCamera() async {
     final res = await AcuantPlatform.instance.showFaceCamera();
-    return res;
-    // if (res is Map) {
-    //   return AcuantImage.fromMap(res);
-    // }
-    // return null;
+    if (res is Map) {
+      return AcuantFaceImage.fromMap(res);
+    }
+    return null;
   }
-  // Future<String?> getPlatformVersion() {
-  //   return AcuantFlutterPlatform.instance.getPlatformVersion();
-  // }
 }

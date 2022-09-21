@@ -7,31 +7,36 @@ import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.camera.core.ImageAnalysis
 import ca.couver.acuant.R
+import ca.couver.acuant.databinding.DocumentFragmentUiBinding
 import ca.couver.acuantcamera.camera.AcuantBaseCameraFragment
 import ca.couver.acuantcamera.camera.AcuantCameraOptions
 import ca.couver.acuantcamera.constant.MINIMUM_DPI
 import ca.couver.acuantcamera.constant.TARGET_DPI
-import ca.couver.acuantcamera.interfaces.IAcuantSavedImage
-import ca.couver.acuant.databinding.DocumentFragmentUiBinding
 import ca.couver.acuantcamera.detector.DocumentFrameAnalyzer
 import ca.couver.acuantcamera.detector.DocumentState
 import ca.couver.acuantcamera.helper.PointsUtils
+import ca.couver.acuantcamera.interfaces.IAcuantSavedImage
 import ca.couver.acuantcamera.overlay.DocRectangleView
 import com.acuant.acuantcommon.model.AcuantError
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
+
 enum class DocumentCameraState { Align, MoveCloser, MoveBack, HoldSteady, CountingDown, Capturing }
 
-class AcuantDocCameraFragment: AcuantBaseCameraFragment() {
+class AcuantDocCameraFragment : AcuantBaseCameraFragment() {
 
     private var rectangleView: DocRectangleView? = null
     private var textView: TextView? = null
+    private var blankCard: ImageView? = null
+
+    //    private var progressIndicator: CircularProgressIndicator? = null
     private var cameraUiContainerBinding: DocumentFragmentUiBinding? = null
     private var latestBarcode: String? = null
     private var capturingTextDrawable: Drawable? = null
@@ -59,7 +64,13 @@ class AcuantDocCameraFragment: AcuantBaseCameraFragment() {
         }
     }
 
-    private fun onDocumentDetection(points: Array<Point>?, ratio: Float?, analyzerDPI: Int, docState: DocumentState, cropDuration: Long) {
+    private fun onDocumentDetection(
+        points: Array<Point>?,
+        ratio: Float?,
+        analyzerDPI: Int,
+        docState: DocumentState,
+        cropDuration: Long
+    ) {
         if (!capturing && !tapToCapture) {
             activity?.runOnUiThread {
 
@@ -77,7 +88,9 @@ class AcuantDocCameraFragment: AcuantBaseCameraFragment() {
 
                     if (!firstThreeTimings.contains((-1).toLong())) {
                         hasFinishedTest = true
-                        if (firstThreeTimings.minOrNull() ?: (TOO_SLOW_FOR_AUTO_THRESHOLD + 10) > TOO_SLOW_FOR_AUTO_THRESHOLD) {
+                        if ((firstThreeTimings.minOrNull()
+                                ?: (TOO_SLOW_FOR_AUTO_THRESHOLD + 10)) > TOO_SLOW_FOR_AUTO_THRESHOLD
+                        ) {
                             setTapToCapture()
                         }
                     }
@@ -87,16 +100,33 @@ class AcuantDocCameraFragment: AcuantBaseCameraFragment() {
                     var detectedPoints = points
                     var realDpi = 0
 
-                    val camContainer = fragmentCameraBinding?.root
+                    val camContainer = fragmentCameraBinding?.uiHolder
                     val analyzerSize = imageAnalyzer?.resolutionInfo?.resolution
                     val previewSize = fragmentCameraBinding?.viewFinder
 
                     val state = if (detectedPoints != null && detectedPoints.size == 4) {
-                        detectedPoints = PointsUtils.fixPoints(PointsUtils.scalePoints(detectedPoints, camContainer, analyzerSize, previewSize, rectangleView))
-                        realDpi = PointsUtils.scaleDpi(analyzerDPI, analyzerSize, imageCapture?.resolutionInfo?.resolution)
+                        detectedPoints = PointsUtils.fixPoints(
+                            PointsUtils.scalePoints(
+                                detectedPoints,
+                                camContainer,
+                                analyzerSize,
+                                previewSize,
+                                rectangleView
+                            )
+                        )
+                        realDpi = PointsUtils.scaleDpi(
+                            analyzerDPI,
+                            analyzerSize,
+                            imageCapture?.resolutionInfo?.resolution
+                        )
                         if (previewSize != null) {
                             val mult = 0.02f
-                            val view = Rect((previewSize.left * (1 + mult)).toInt(), (previewSize.top * (1 + mult)).toInt(), (previewSize.right * (1 - mult)).toInt(), (previewSize.bottom * (1 - mult)).toInt())
+                            val view = Rect(
+                                (previewSize.left * (1 + mult)).toInt(),
+                                (previewSize.top * (1 + mult)).toInt(),
+                                (previewSize.right * (1 - mult)).toInt(),
+                                (previewSize.bottom * (1 - mult)).toInt()
+                            )
                             var isContained = true
                             detectedPoints.forEach {
                                 if (!view.contains(it.y, it.x)) {
@@ -157,7 +187,11 @@ class AcuantDocCameraFragment: AcuantBaseCameraFragment() {
                                     setTextFromState(DocumentCameraState.CountingDown)
                                 }
                                 else -> {
-                                    val middle = PointsUtils.findMiddleForCamera(points, fragmentCameraBinding?.root?.width, fragmentCameraBinding?.root?.height)
+                                    val middle = PointsUtils.findMiddleForCamera(
+                                        points,
+                                        fragmentCameraBinding?.uiHolder?.width,
+                                        fragmentCameraBinding?.uiHolder?.height
+                                    )
                                     captureImage(object : IAcuantSavedImage {
                                         override fun onSaved(uri: String) {
                                             cameraActivityListener.onCameraDone(uri, latestBarcode)
@@ -221,8 +255,30 @@ class AcuantDocCameraFragment: AcuantBaseCameraFragment() {
         }
     }
 
+//    private fun showLoading() {
+//        textView?.visibility = View.INVISIBLE
+//        rectangleView?.visibility = View.INVISIBLE
+//        progressIndicator?.visibility = View.VISIBLE
+//    }
+//
+//    private fun hideLoading() {
+//        textView?.visibility = View.VISIBLE
+//        rectangleView?.visibility = View.VISIBLE
+//        progressIndicator?.visibility = View.INVISIBLE
+//    }
+
+    private fun hideBlankCard() {
+        if (blankCard?.visibility != View.INVISIBLE) {
+            blankCard?.visibility = View.INVISIBLE
+            textView?.visibility = View.VISIBLE
+            rectangleView?.visibility = View.VISIBLE
+        }
+    }
+
     private fun setTextFromState(state: DocumentCameraState) {
-        textView?.visibility = View.VISIBLE
+        if (state != DocumentCameraState.Align) {
+            hideBlankCard()
+        }
         if (!isAdded)
             return
 
@@ -294,6 +350,7 @@ class AcuantDocCameraFragment: AcuantBaseCameraFragment() {
 
     override fun rotateUi(rotation: Int) {
         textView?.rotation = rotation.toFloat()
+        blankCard?.rotation = rotation.toFloat()
     }
 
     override fun resetWorkflow() {
@@ -302,7 +359,8 @@ class AcuantDocCameraFragment: AcuantBaseCameraFragment() {
         if (tapToCapture) {
             setTextFromState(DocumentCameraState.Align)
             textView?.text = getString(R.string.acuant_camera_align_and_tap)
-            textView?.layoutParams?.width = context?.resources?.getDimension(R.dimen.cam_info_width)?.toInt() ?: 300
+            textView?.layoutParams?.width =
+                context?.resources?.getDimension(R.dimen.cam_info_width)?.toInt() ?: 300
         }
     }
 
@@ -317,24 +375,31 @@ class AcuantDocCameraFragment: AcuantBaseCameraFragment() {
         greenTransparent = getColorWithAlpha(Color.GREEN, .50f)
 
         cameraUiContainerBinding?.root?.let {
-                fragmentCameraBinding!!.root.removeView(it)
-            }
+            fragmentCameraBinding!!.uiHolder.removeView(it)
+        }
 
         cameraUiContainerBinding = DocumentFragmentUiBinding.inflate(
             LayoutInflater.from(requireContext()),
-            fragmentCameraBinding!!.root,
+            fragmentCameraBinding!!.uiHolder,
             true
         )
 
         rectangleView = cameraUiContainerBinding?.documentRectangle
         textView = cameraUiContainerBinding?.documentText
+        blankCard = cameraUiContainerBinding?.blankIdCard
+//        progressIndicator = cameraUiContainerBinding?.documentLoading
 
         setOptions(rectangleView)
         currentDigit = 0
 
-        capturingTextDrawable =  AppCompatResources.getDrawable(requireContext(), R.drawable.camera_text_config_capturing)
-        defaultTextDrawable = AppCompatResources.getDrawable(requireContext(), R.drawable.camera_text_config_default)
-        holdTextDrawable = AppCompatResources.getDrawable(requireContext(), R.drawable.camera_text_config_hold)
+        capturingTextDrawable = AppCompatResources.getDrawable(
+            requireContext(),
+            R.drawable.camera_text_config_capturing
+        )
+        defaultTextDrawable =
+            AppCompatResources.getDrawable(requireContext(), R.drawable.camera_text_config_default)
+        holdTextDrawable =
+            AppCompatResources.getDrawable(requireContext(), R.drawable.camera_text_config_hold)
 
     }
 
@@ -343,8 +408,9 @@ class AcuantDocCameraFragment: AcuantBaseCameraFragment() {
         tapToCapture = true
         setTextFromState(DocumentCameraState.Align)
         textView?.text = getString(R.string.acuant_camera_align_and_tap)
-        textView?.layoutParams?.width = context?.resources?.getDimension(R.dimen.cam_info_width)?.toInt() ?: 300
-        fragmentCameraBinding?.root?.setOnClickListenerWithPoint { point ->
+        textView?.layoutParams?.width =
+            context?.resources?.getDimension(R.dimen.cam_info_width)?.toInt() ?: 300
+        fragmentCameraBinding?.uiHolder?.setOnClickListenerWithPoint { point ->
             activity?.runOnUiThread {
                 textView?.setBackgroundColor(greenTransparent)
                 textView?.text = getString(R.string.acuant_camera_capturing)
@@ -368,9 +434,15 @@ class AcuantDocCameraFragment: AcuantBaseCameraFragment() {
     }
 
     override fun buildImageAnalyzer(screenAspectRatio: Int, trueScreenRatio: Float, rotation: Int) {
-        frameAnalyzer = DocumentFrameAnalyzer (trueScreenRatio) { result, detectTime ->
+        frameAnalyzer = DocumentFrameAnalyzer(trueScreenRatio) { result, detectTime ->
             onBarcodeDetection(result.barcode)
-            onDocumentDetection(result.points, result.currentDistRatio, result.analyzerDpi, result.state, detectTime)
+            onDocumentDetection(
+                result.points,
+                result.currentDistRatio,
+                result.analyzerDpi,
+                result.state,
+                detectTime
+            )
         }
         if (!acuantOptions.autoCapture) {
             setTapToCapture()
@@ -394,10 +466,16 @@ class AcuantDocCameraFragment: AcuantBaseCameraFragment() {
 
         @Suppress("SameParameterValue")
         private fun getColorWithAlpha(color: Int, ratio: Float): Int {
-            return Color.argb((Color.alpha(color) * ratio).roundToInt(), Color.red(color), Color.green(color), Color.blue(color))
+            return Color.argb(
+                (Color.alpha(color) * ratio).roundToInt(),
+                Color.red(color),
+                Color.green(color),
+                Color.blue(color)
+            )
         }
 
-        @JvmStatic fun newInstance(acuantOptions: AcuantCameraOptions): AcuantDocCameraFragment {
+        @JvmStatic
+        fun newInstance(acuantOptions: AcuantCameraOptions): AcuantDocCameraFragment {
             val frag = AcuantDocCameraFragment()
             val args = Bundle()
             args.putSerializable(INTERNAL_OPTIONS, acuantOptions)

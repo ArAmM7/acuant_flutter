@@ -2,6 +2,7 @@ package ca.couver.acuantcamera.camera
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import ca.couver.acuant.R
@@ -15,7 +16,7 @@ import ca.couver.acuantcamera.helper.MrzResult
 import ca.couver.acuant.databinding.ActivityCameraBinding
 import com.acuant.acuantcommon.model.AcuantError
 
-class AcuantCameraActivity: AppCompatActivity(), ICameraActivityFinish {
+class AcuantCameraActivity : AppCompatActivity(), ICameraActivityFinish {
 
     private lateinit var binding: ActivityCameraBinding
 
@@ -35,7 +36,7 @@ class AcuantCameraActivity: AppCompatActivity(), ICameraActivityFinish {
             unserializedOptions as AcuantCameraOptions
         }
 
-        //start the camera if this si the first time the activity is created (camera already exists otherwise)
+        //start the camera if this is the first time the activity is created (camera already exists otherwise)
         if (savedInstanceState == null) {
             val cameraFragment: AcuantBaseCameraFragment = when (options.cameraMode) {
                 AcuantCameraOptions.CameraMode.BarcodeOnly -> {
@@ -52,6 +53,7 @@ class AcuantCameraActivity: AppCompatActivity(), ICameraActivityFinish {
             supportFragmentManager.beginTransaction()
                 .replace(R.id.container, cameraFragment as Fragment)
                 .commit()
+
         }
     }
 

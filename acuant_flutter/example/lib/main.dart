@@ -1,9 +1,4 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-// import 'dart:async';
-
-// import 'package:flutter/services.dart';
 import 'package:acuant_flutter/acuant_flutter.dart';
 
 void main() {
@@ -21,35 +16,13 @@ class _MyAppState extends State<MyApp> {
   // String _platformVersion = 'Unknown';
   // final _acuantFlutterPlugin = Acuant();
 
-  AcuantImage? acuantImage;
+  AcuantDocumentImage? acuantDocumentImage;
+  AcuantFaceImage? acuantFaceImage;
 
   @override
   void initState() {
     super.initState();
-    // initPlatformState();
   }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  // Future<void> initPlatformState() async {
-  //   String platformVersion;
-  //   // Platform messages may fail, so we use a try/catch PlatformException.
-  //   // We also handle the message potentially returning null.
-  //   try {
-  //     platformVersion =
-  //         await _acuantFlutterPlugin.getPlatformVersion() ?? 'Unknown platform version';
-  //   } on PlatformException {
-  //     platformVersion = 'Failed to get platform version.';
-  //   }
-
-  //   // If the widget was removed from the tree while the asynchronous platform
-  //   // message was in flight, we want to discard the reply rather than calling
-  //   // setState to update our non-existent appearance.
-  //   if (!mounted) return;
-
-  //   setState(() {
-  //     _platformVersion = platformVersion;
-  //   });
-  // }
 
   void initAcuant() async {
     bool res = await Acuant.instance.initialize(
@@ -60,11 +33,27 @@ class _MyAppState extends State<MyApp> {
   }
 
   void showDocumentCamera() async {
+    setState(() {
+      acuantDocumentImage = null;
+    });
     final res = await Acuant.instance.showDocumentCamera();
     print(res);
-    if (res is AcuantImage) {
+    if (res is AcuantDocumentImage) {
       setState(() {
-        acuantImage = res;
+        acuantDocumentImage = res;
+      });
+    }
+  }
+
+  void showFaceCamera() async {
+    setState(() {
+      acuantFaceImage = null;
+    });
+    final res = await Acuant.instance.showFaceCamera();
+    print(res);
+    if (res is AcuantFaceImage) {
+      setState(() {
+        acuantFaceImage = res;
       });
     }
   }
@@ -90,14 +79,23 @@ class _MyAppState extends State<MyApp> {
                   onPressed: showDocumentCamera,
                   child: Text('showDocumentCamera'),
                 ),
-                if (acuantImage != null) ...[
-                  Image.memory(acuantImage!.rawBytes),
-                  Text("Aspect ${acuantImage!.aspectRatio}"),
-                  Text("DPI ${acuantImage!.dpi}"),
-                  Text("Glare ${acuantImage!.glare}"),
+                ElevatedButton(
+                  onPressed: showFaceCamera,
+                  child: Text('showFaceCamera'),
+                ),
+                if (acuantDocumentImage != null) ...[
+                  Image.memory(acuantDocumentImage!.rawBytes),
+                  Text("Aspect ${acuantDocumentImage!.aspectRatio}"),
+                  Text("DPI ${acuantDocumentImage!.dpi}"),
+                  Text("Glare ${acuantDocumentImage!.glare}"),
                   Text(
-                      "isCorrectAspectRatio ${acuantImage!.isCorrectAspectRatio}"),
-                  Text("isPassport ${acuantImage!.isPassport}"),
+                      "isCorrectAspectRatio ${acuantDocumentImage!.isCorrectAspectRatio}"),
+                  Text("isPassport ${acuantDocumentImage!.isPassport}"),
+                  Text("Sharpness ${acuantDocumentImage!.sharpness}"),
+                ],
+                if (acuantFaceImage != null) ...[
+                  Image.memory(acuantFaceImage!.rawBytes),
+                  Text("Liveness ${acuantFaceImage!.liveness}"),
                 ]
               ],
             ),

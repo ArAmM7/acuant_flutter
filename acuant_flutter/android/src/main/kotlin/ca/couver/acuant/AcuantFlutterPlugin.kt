@@ -2,8 +2,12 @@ package ca.couver.acuant
 
 // Basics
 import android.app.Activity
+import android.app.Activity.RESULT_CANCELED
 import android.app.Activity.RESULT_OK
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.util.Log
 import androidx.annotation.NonNull
 import ca.couver.acuantcamera.camera.AcuantCameraActivity
@@ -15,6 +19,8 @@ import ca.couver.acuantcamera.constant.ACUANT_EXTRA_IMAGE_URL
 import ca.couver.acuantcamera.initializer.MrzCameraInitializer
 import ca.couver.acuantfacecapture.camera.AcuantFaceCameraActivity
 import ca.couver.acuantfacecapture.constant.Constants.ACUANT_EXTRA_FACE_CAPTURE_OPTIONS
+import ca.couver.acuantfacecapture.constant.Constants.ACUANT_EXTRA_FACE_IMAGE_URL
+import ca.couver.acuantfacecapture.model.CameraMode
 import ca.couver.acuantfacecapture.model.FaceCaptureOptions
 import com.acuant.acuantcommon.exception.AcuantException
 import com.acuant.acuantcommon.initializer.AcuantInitializer
@@ -26,6 +32,10 @@ import com.acuant.acuantimagepreparation.background.EvaluateImageListener
 import com.acuant.acuantimagepreparation.initializer.ImageProcessorInitializer
 import com.acuant.acuantimagepreparation.model.AcuantImage
 import com.acuant.acuantimagepreparation.model.CroppingData
+import com.acuant.acuantpassiveliveness.AcuantPassiveLiveness
+import com.acuant.acuantpassiveliveness.model.PassiveLivenessData
+import com.acuant.acuantpassiveliveness.model.PassiveLivenessResult
+import com.acuant.acuantpassiveliveness.service.PassiveLivenessListener
 
 // Flutter
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -37,6 +47,9 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry
 import io.flutter.plugin.common.PluginRegistry.Registrar
+import java.io.BufferedInputStream
+import java.io.File
+import java.io.FileInputStream
 
 
 class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
@@ -58,114 +71,134 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
                 registrar.addActivityResultListener(AcuantFlutterPlugin)
             }
         }
-
-//        const val SCANRESULT = "scan"
-//        const val Request_Scan = 1
-//        const val TAG = "MajascanPlugin"
     }
 
     private var mChannel: MethodChannel? = null
     private var mResult: Result? = null
     private var activity: Activity? = null
     private var isInitialized = false
+    private var processingFacialLiveness = false
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
-        mResult = result;
-        when (call.method) {
-            Constants.REQ_INITIALIZE -> {
-                val username = call.argument<String>("username")
-                val password = call.argument<String>("password")
-                val subscription = call.argument<String>("subscription")
-                try {
-                    initializeAcuantSdk(username, password, subscription)
-                } catch (e: AcuantException) {
-                    result.error("100", "Acuant Error", {})
+        if (call.method != Constants.REQ_INITIALIZE && !isInitialized) {
+            result.error("10", "Please initialize first", null)
+        } else {
+            mResult = result;
+            when (call.method) {
+                Constants.REQ_INITIALIZE -> {
+                    val username = call.argument<String>("username")
+                    val password = call.argument<String>("password")
+                    val subscription = call.argument<String>("subscription")
+                    try {
+                        initializeAcuantSdk(username, password, subscription)
+                    } catch (e: AcuantException) {
+                        result.error("100", "Acuant Error", {})
+                    }
                 }
+                Constants.REQ_DOC_CAM -> showDocumentCapture()
+                Constants.REQ_FACE_CAM -> showFaceCapture()
+                else -> result.notImplemented()
             }
-            Constants.REQ_DOC_CAM -> {
-                showDocumentCaptureCamera()
-            }
-            Constants.REQ_FACE_CAM -> {
-                showFaceCaptureCamera()
-            }
-            else -> {
-                result.notImplemented()
-            }
+        }
+    }
+
+    private fun readFromFile(fileUri: String): ByteArray {
+        val file = File(fileUri)
+        val bytes = ByteArray(file.length().toInt())
+        try {
+            val buf = BufferedInputStream(FileInputStream(file))
+            buf.read(bytes, 0, bytes.size)
+            buf.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        file.delete()
+        return bytes
+    }
+
+    private fun handleDocumentCapture(data: Intent?) {
+        val url = data?.getStringExtra(ACUANT_EXTRA_IMAGE_URL)
+        if (url == null) {
+            mResult?.error("1", "Something went wrong", "Can not find captured image")
+        } else {
+            AcuantImagePreparation.evaluateImage(activity!!, CroppingData(url), object :
+                EvaluateImageListener {
+                override fun onSuccess(image: AcuantImage) {
+                    mResult?.success(
+                        hashMapOf(
+                            "RAW_BYTES" to image.rawBytes,
+                            "ASPECT_RATIO" to image.aspectRatio,
+                            "DPI" to image.dpi,
+                            "GLARE" to image.glare,
+                            "IS_CORRECT_ASPECT_RATIO" to image.isCorrectAspectRatio,
+                            "IS_PASSPORT" to image.isPassport,
+                            "SHARPNESS" to image.sharpness,
+                        )
+                    )
+                }
+
+                override fun onError(error: AcuantError) {
+                    mResult?.error(
+                        error.errorCode.toString(),
+                        error.errorDescription,
+                        error.additionalDetails
+                    )
+                }
+            })
+        }
+    }
+
+    private fun handleFaceCapture(data: Intent?) {
+        val url = data?.getStringExtra(ACUANT_EXTRA_FACE_IMAGE_URL)
+        if (url == null) {
+            mResult?.error("1", "Something went wrong", "Can not find captured image")
+        } else {
+            val bytes = readFromFile(url)
+            mResult?.success(
+                hashMapOf(
+                    "RAW_BYTES" to bytes,
+                    "LIVE" to "facialLivelinessResultString",
+                )
+            )
         }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
-        if (requestCode == Constants.ACT_DOC_CAM_CODE && resultCode == RESULT_OK && data != null) {
-            val url = data?.getStringExtra(ACUANT_EXTRA_IMAGE_URL)
-            if (url != null) {
-                AcuantImagePreparation.evaluateImage(activity!!, CroppingData(url), object :
-                    EvaluateImageListener {
-                    override fun onSuccess(image: AcuantImage) {
-                        mResult?.success(
-                            hashMapOf(
-                                "RAW_BYTES" to image.rawBytes,
-                                "ASPECT_RATIO" to image.aspectRatio,
-                                "DPI" to image.dpi,
-                                "GLARE" to image.glare,
-                                "IS_CORRECT_ASPECT_RATIO" to image.isCorrectAspectRatio,
-                                "IS_PASSPORT" to image.isPassport,
-                                "SHARPNESS" to image.sharpness,
-                            )
-                        )
-                    }
-
-                    override fun onError(error: AcuantError) {
-                        mResult?.error(
-                            error.errorCode.toString(),
-                            error.errorDescription,
-                            error.additionalDetails
-                        )
-                    }
-                })
+        when (resultCode) {
+            RESULT_OK -> {
+                when (requestCode) {
+                    Constants.ACT_DOC_CAM_CODE -> handleDocumentCapture(data)
+                    Constants.ACT_FACE_CAM_CODE -> handleFaceCapture(data)
+                    else -> mResult?.error(
+                        "2",
+                        "Not implemented",
+                        "It's not a result from camera intent"
+                    )
+                }
             }
-        } else if (requestCode == Constants.ACT_FACE_CAM_CODE && resultCode == RESULT_OK && data != null) {
-            val url = data?.getStringExtra(ACUANT_EXTRA_IMAGE_URL)
-            if (url != null) {
-                AcuantImagePreparation.evaluateImage(activity!!, CroppingData(url), object :
-                    EvaluateImageListener {
-                    override fun onSuccess(image: AcuantImage) {
-                        mResult?.success(
-                            hashMapOf(
-                                "RAW_BYTES" to image.rawBytes,
-                                "ASPECT_RATIO" to image.aspectRatio,
-                                "DPI" to image.dpi,
-                                "GLARE" to image.glare,
-                                "IS_CORRECT_ASPECT_RATIO" to image.isCorrectAspectRatio,
-                                "IS_PASSPORT" to image.isPassport,
-                                "SHARPNESS" to image.sharpness,
-                            )
-                        )
-                    }
-
-                    override fun onError(error: AcuantError) {
-                        mResult?.error(
-                            error.errorCode.toString(),
-                            error.errorDescription,
-                            error.additionalDetails
-                        )
-                    }
-                })
-            }
-        } else {
-            mResult?.error("0", "Cancelled", null)
+            RESULT_CANCELED -> mResult?.error(RESULT_CANCELED.toString(), "Cancelled", null)
+            else -> mResult?.error("3", "Something went wrong", null)
         }
-        return false
+        return true
     }
 
-    private val initializeCallback = object : IAcuantPackageCallback {
+    private val handleInitialize = object : IAcuantPackageCallback {
         override fun onInitializeSuccess() {
             isInitialized = true;
             mResult?.success(true)
         }
 
-        override fun onInitializeFailed(error: List<AcuantError>) {
+        override fun onInitializeFailed(errors: List<AcuantError>) {
             isInitialized = false;
-            mResult?.success(false)
+            var error: AcuantError? = null;
+            if (errors.isNotEmpty()) {
+                error = errors[0];
+            }
+            mResult?.error(
+                error?.errorCode?.toString() ?: "9",
+                error?.errorDescription ?: "Unknown error",
+                null
+            )
         }
     }
 
@@ -175,14 +208,10 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         password: String?,
         subscription: String?,
     ) {
-
-        println("initializeAcuantSdk")
         try {
             if (activity == null) {
                 mResult?.error("100", "Android Activity not found", null);
             } else {
-
-
                 Credential.init(
                     username,
                     password,
@@ -199,7 +228,7 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
                     null,
                     activity!!,
                     listOf(ImageProcessorInitializer(), MrzCameraInitializer()),
-                    initializeCallback
+                    handleInitialize
                 )
             }
 
@@ -209,7 +238,7 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     }
 
 
-    private fun showDocumentCaptureCamera() {
+    private fun showDocumentCapture() {
         activity?.let {
             val cameraIntent = Intent(
                 it,
@@ -225,7 +254,7 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         }
     }
 
-    private fun showFaceCaptureCamera() {
+    private fun showFaceCapture() {
         activity?.let {
             val cameraIntent = Intent(
                 it,
@@ -233,7 +262,11 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             )
             cameraIntent.putExtra(
                 ACUANT_EXTRA_FACE_CAPTURE_OPTIONS,
-                FaceCaptureOptions()
+                FaceCaptureOptions(
+                    cameraMode = CameraMode.HgLiveness,
+//                    showOval = true,
+                    totalCaptureTime = 0,
+                )
             )
             it.startActivityForResult(cameraIntent, Constants.ACT_FACE_CAM_CODE)
         }
@@ -259,6 +292,8 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
 //            }
 //        }
 
+
+    // Flutter plugin
 
     override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         mChannel = MethodChannel(flutterPluginBinding.binaryMessenger, "ca.couver.acuantchannel")

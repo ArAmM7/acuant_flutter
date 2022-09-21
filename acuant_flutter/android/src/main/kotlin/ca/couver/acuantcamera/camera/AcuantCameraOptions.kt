@@ -15,7 +15,7 @@ import java.io.Serializable
 open class AcuantCameraOptions
 internal constructor(
     internal val timeInMsPerDigit: Int = 900,
-    internal val digitsToShow: Int = 2,
+    internal val digitsToShow: Int = 0,
     internal val allowBox : Boolean = true,
     internal val autoCapture : Boolean = true,
     internal val bracketLengthInHorizontal : Int = 155,
@@ -24,7 +24,7 @@ internal constructor(
     internal val defaultBracketMarginHeight : Int = 160,
     internal val colorHold : Int = Color.YELLOW,
     internal val colorCapturing : Int = Color.GREEN,
-    internal val colorBracketAlign : Int = Color.BLACK,
+    internal val colorBracketAlign : Int = Color.WHITE,
     internal val colorBracketCloser : Int = Color.RED,
     internal val colorBracketHold : Int = Color.YELLOW,
     internal val colorBracketCapturing : Int = Color.GREEN,
@@ -45,8 +45,8 @@ internal constructor(
     @Suppress("unused")
     class DocumentCameraOptionsBuilder {
         private var timeInMsPerDigit: Int = 900
-        private var digitsToShow: Int = 2
-        private var allowBox : Boolean = true
+        private var digitsToShow: Int = 0
+        private var allowBox : Boolean = false
         private var autoCapture : Boolean = true
         private var bracketLengthInHorizontal : Int = 155
         private var bracketLengthInVertical : Int = 255
@@ -54,7 +54,7 @@ internal constructor(
         private var defaultBracketMarginHeight : Int = 160
         private var colorHold : Int = Color.YELLOW
         private var colorCapturing : Int = Color.GREEN
-        private var colorBracketAlign : Int = Color.BLACK
+        private var colorBracketAlign : Int = Color.WHITE
         private var colorBracketCloser : Int = Color.RED
         private var colorBracketHold : Int = Color.YELLOW
         private var colorBracketCapturing : Int = Color.GREEN
@@ -212,7 +212,7 @@ internal constructor(
     @Suppress("unused")
     class MrzCameraOptionsBuilder {
         private var timeInMsPerDigit: Int = 900
-        private var digitsToShow: Int = 2
+        private var digitsToShow: Int = 0
         private var allowBox : Boolean = true
         private var autoCapture : Boolean = true
         private var bracketLengthInHorizontal : Int = 55
@@ -221,7 +221,7 @@ internal constructor(
         private var defaultBracketMarginHeight : Int = 100
         private var colorHold : Int = Color.YELLOW
         private var colorCapturing : Int = Color.GREEN
-        private var colorBracketAlign : Int = Color.BLACK
+        private var colorBracketAlign : Int = Color.WHITE
         private var colorBracketCloser : Int = Color.RED
         private var colorBracketHold : Int = Color.YELLOW
         private var colorBracketCapturing : Int = Color.GREEN

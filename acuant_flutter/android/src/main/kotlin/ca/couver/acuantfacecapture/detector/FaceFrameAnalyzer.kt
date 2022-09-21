@@ -91,11 +91,11 @@ class FaceFrameAnalyzer internal constructor(private val listener: FaceFrameList
         private val faceDetector = FaceDetection.getClient(FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
             .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-            .setMinFaceSize(0.5f)
+            .setMinFaceSize(0.46f)
             .build())
 
-        private const val TOO_CLOSE_THRESH = 0.815f
-        private const val TOO_FAR_THRESH = 0.635f
+        private const val TOO_CLOSE_THRESH = 0.81f
+        private const val TOO_FAR_THRESH = 0.56f
         private const val EYE_CLOSED_THRESHOLD = 0.3f
         private const val Y_ROT_ANGLE = 10
         private const val Z_ROT_ANGLE = 15

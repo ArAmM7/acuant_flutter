@@ -158,6 +158,11 @@ class DocumentFrameAnalyzer internal constructor(private val trueScreenRatio: Fl
     }
 
     companion object {
+//        private const val ALLOWED_RATIO_VARIANCE = 0.09f
+//        private const val DEFAULT_MIN_DIST = 0.71f
+//        private const val DEFAULT_MAX_DIST = DEFAULT_MIN_DIST + ALLOWED_RATIO_VARIANCE
+//        private const val DEFAULT_MIN_DIST_BOUND = 0.51f
+//        private const val DEFAULT_MAX_DIST_BOUND = 0.91f
         private const val ALLOWED_RATIO_VARIANCE = 0.09f
         private const val DEFAULT_MIN_DIST = 0.71f
         private const val DEFAULT_MAX_DIST = DEFAULT_MIN_DIST + ALLOWED_RATIO_VARIANCE
