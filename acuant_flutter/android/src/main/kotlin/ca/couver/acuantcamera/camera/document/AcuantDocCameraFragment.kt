@@ -401,6 +401,10 @@ class AcuantDocCameraFragment : AcuantBaseCameraFragment() {
         holdTextDrawable =
             AppCompatResources.getDrawable(requireContext(), R.drawable.camera_text_config_hold)
 
+        if (acuantOptions.isBack) {
+            blankCard?.setImageResource(R.drawable.ic_id_card_back_200)
+        }
+
     }
 
     private fun setTapToCapture() {

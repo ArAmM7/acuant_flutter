@@ -39,18 +39,18 @@ class _MyPageState extends State<MyPage> {
 
   void initAcuant() async {
     bool res = await Acuant.instance.initialize(
-      username: '',
-      password: '',
+      username: 'dev_Trulioo_eBFXmb',
+      password: 'EHL8uzqkAx4RBKFQ@',
     );
     print(res);
   }
 
-  void showDocumentCamera() async {
+  void showDocumentCamera({bool isBack = false}) async {
     setState(() {
       acuantDocumentImage = null;
     });
     try {
-      final res = await Acuant.instance.showDocumentCamera();
+      final res = await Acuant.instance.showDocumentCamera(isBack: isBack);
       print(res);
       if (res is AcuantDocumentImage) {
         setState(() {
@@ -98,15 +98,19 @@ class _MyPageState extends State<MyPage> {
             children: [
               ElevatedButton(
                 onPressed: initAcuant,
-                child: Text('initialize'),
+                child: const Text('initialize'),
               ),
               ElevatedButton(
                 onPressed: showDocumentCamera,
-                child: Text('showDocumentCamera'),
+                child: const Text('showDocumentCamera'),
+              ),
+              ElevatedButton(
+                onPressed: () => showDocumentCamera(isBack: true),
+                child: const Text('showDocumentCamera Back'),
               ),
               ElevatedButton(
                 onPressed: showFaceCamera,
-                child: Text('showFaceCamera'),
+                child: const Text('showFaceCamera'),
               ),
               if (acuantDocumentImage != null) ...[
                 Image.memory(acuantDocumentImage!.rawBytes),

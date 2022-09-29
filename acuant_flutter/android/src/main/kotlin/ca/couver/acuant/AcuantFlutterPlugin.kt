@@ -77,7 +77,7 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     private var mResult: Result? = null
     private var activity: Activity? = null
     private var isInitialized = false
-    private var processingFacialLiveness = false
+//    private var processingFacialLiveness = false
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
         if (call.method != Constants.REQ_INITIALIZE && !isInitialized) {
@@ -92,10 +92,13 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
                     try {
                         initializeAcuantSdk(username, password, subscription)
                     } catch (e: AcuantException) {
-                        result.error("100", "Acuant Error", {})
+                        result.error("100", e.localizedMessage, {})
                     }
                 }
-                Constants.REQ_DOC_CAM -> showDocumentCapture()
+                Constants.REQ_DOC_CAM -> {
+                    val isBack = call.argument<Boolean>("isBack")
+                    showDocumentCapture(isBack ?: false)
+                }
                 Constants.REQ_FACE_CAM -> showFaceCapture()
                 else -> result.notImplemented()
             }
@@ -238,7 +241,7 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     }
 
 
-    private fun showDocumentCapture() {
+    private fun showDocumentCapture(isBack: Boolean = false) {
         activity?.let {
             val cameraIntent = Intent(
                 it,
@@ -247,7 +250,7 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             cameraIntent.putExtra(
                 ACUANT_EXTRA_CAMERA_OPTIONS,
                 AcuantCameraOptions
-                    .DocumentCameraOptionsBuilder()
+                    .DocumentCameraOptionsBuilder().setBack(isBack)
                     .build()
             )
             it.startActivityForResult(cameraIntent, Constants.ACT_DOC_CAM_CODE)

@@ -199,6 +199,7 @@ abstract class AcuantBaseCameraFragment : Fragment() {
 
         if (opts != null) {
             acuantOptions = opts
+
         } else {
             cameraActivityListener.onError(
                 AcuantError(

@@ -1,6 +1,6 @@
 name: acuant_platform_interface
 description: A common platform interface for the acuant_flutter plugin.
-version: 0.0.1
+version: 0.0.3
 homepage:
 
 environment:
