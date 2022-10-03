@@ -39,8 +39,8 @@ class _MyPageState extends State<MyPage> {
 
   void initAcuant() async {
     bool res = await Acuant.instance.initialize(
-      username: 'dev_Trulioo_eBFXmb',
-      password: 'EHL8uzqkAx4RBKFQ@',
+      username: '',
+      password: '',
     );
     print(res);
   }
