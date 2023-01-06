@@ -19,6 +19,8 @@ class AcuantDocumentImage {
   final int sharpness;
 
   static AcuantDocumentImage? fromMap(Map data) {
+    print("AcuantDocumentImage? fromMap");
+    print(data);
     try {
       return AcuantDocumentImage(
         rawBytes: data["RAW_BYTES"],
@@ -30,6 +32,7 @@ class AcuantDocumentImage {
         sharpness: data["SHARPNESS"],
       );
     } catch (e) {
+      print(e);
       return null;
     }
   }

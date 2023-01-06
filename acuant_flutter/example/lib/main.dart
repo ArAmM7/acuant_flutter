@@ -1,3 +1,4 @@
+import 'package:acuant_flutter_example/acuant_key.dart';
 import 'package:flutter/material.dart';
 import 'package:acuant_flutter/acuant_flutter.dart';
 import 'package:flutter/services.dart';
@@ -39,8 +40,8 @@ class _MyPageState extends State<MyPage> {
 
   void initAcuant() async {
     bool res = await Acuant.instance.initialize(
-      username: '',
-      password: '',
+      username: kAcuantUsername,
+      password: kAcuantPassword,
     );
     print(res);
   }
@@ -72,15 +73,28 @@ class _MyPageState extends State<MyPage> {
   }
 
   void showFaceCamera() async {
-    setState(() {
-      acuantFaceImage = null;
-    });
-    final res = await Acuant.instance.showFaceCamera();
-    print(res);
-    if (res is AcuantFaceImage) {
+    try {
       setState(() {
-        acuantFaceImage = res;
+        acuantFaceImage = null;
       });
+      final res = await Acuant.instance.showFaceCamera();
+      print(res);
+      if (res is AcuantFaceImage) {
+        setState(() {
+          acuantFaceImage = res;
+        });
+      }
+    } on PlatformException catch (e) {
+      showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text("Error"),
+              content: Text(e.message ?? "An error has occured"),
+            );
+          });
+    } catch (e) {
+      print(e);
     }
   }
 

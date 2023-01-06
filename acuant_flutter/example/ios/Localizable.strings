@@ -1,19 +1,9 @@
-# acuant_flutter
-
-Acuant document camera and selfie camera for flutter
-
-### For IOS
-
-Use localize strings
-In XCode, create a Localizable.strings file and put
-
-```string
-/*
+/* 
   Localizable.strings
   Runner
 
   Created by Edward Yuan on 2022-12-12.
-
+  
 */
 
 /* SampleApp */
@@ -100,5 +90,3 @@ In XCode, create a Localizable.strings file and put
 "IProov_PromptGrantPermission" = "Grant Camera Access";
 "IProov_PromptGrantPermissionMessage" = "Camera access must be granted to use iProov";
 "IProov_FailureAmbiguousOutcome" = "Ambiguous outcome";
-
-```
