@@ -90,7 +90,7 @@ class _MyPageState extends State<MyPage> {
           builder: (BuildContext context) {
             return AlertDialog(
               title: const Text("Error"),
-              content: Text(e.message ?? "An error has occured"),
+              content: Text(e.message ?? "An error has occurred"),
             );
           });
     } catch (e) {

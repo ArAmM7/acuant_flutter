@@ -4,7 +4,41 @@ Acuant document camera and selfie camera for flutter
 
 ### For IOS
 
-Use localize strings
+#### In Podfile
+
+replace
+
+```rb
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+  end
+end
+```
+
+with
+
+```rb
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    if %w[
+         AcuantiOSSDKV11
+         Socket.IO-Client-Swift
+         Starscream
+       ].include? target.name
+      target.build_configurations.each do |config|
+        config.build_settings["BUILD_LIBRARY_FOR_DISTRIBUTION"] = "YES"
+        config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "arm64"
+      end
+    else
+      flutter_additional_ios_build_settings(target)
+    end
+  end
+end
+```
+
+#### Use localize strings
+
 In XCode, create a Localizable.strings file and put
 
 ```string
