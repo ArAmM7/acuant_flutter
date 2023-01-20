@@ -1,6 +1,6 @@
 name: acuant_flutter
 description: Flutter plugin for Acuant Camera (Android only)
-version: 0.0.4
+version: 0.0.5
 homepage: https://github.com/eddyuan/acuant_flutter
 
 environment:

@@ -88,7 +88,7 @@ dependencies {
     implementation "com.acuant:acuantcommon:$acuant_version"
     implementation "com.acuant:acuantimagepreparation:$acuant_version"
     implementation "com.acuant:acuantdocumentprocessing:$acuant_version"
-    implementation "com.acuant:acuantechipreader:$acuant_version"
+//    implementation "com.acuant:acuantechipreader:$acuant_version"
     implementation "com.acuant:acuantfacematch:$acuant_version"
     implementation "com.acuant:acuantipliveness:$acuant_version"
     implementation "com.acuant:acuantpassiveliveness:$acuant_version"
