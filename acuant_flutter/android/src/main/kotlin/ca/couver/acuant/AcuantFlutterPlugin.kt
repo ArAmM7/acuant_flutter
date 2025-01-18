@@ -77,6 +77,7 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     private var mResult: Result? = null
     private var activity: Activity? = null
     private var isInitialized = false
+    private var resultSubmitted = false
 //    private var processingFacialLiveness = false
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
@@ -96,10 +97,14 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
                     }
                 }
                 Constants.REQ_DOC_CAM -> {
+                    resultSubmitted = false
                     val isBack = call.argument<Boolean>("isBack")
                     showDocumentCapture(isBack ?: false)
                 }
-                Constants.REQ_FACE_CAM -> showFaceCapture()
+                Constants.REQ_FACE_CAM ->{
+                    resultSubmitted = false
+                     showFaceCapture()
+                }
                 else -> result.notImplemented()
             }
         }
@@ -167,7 +172,11 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if(resultSubmitted) {
+                return false
+            }
         when (resultCode) {
+
             RESULT_OK -> {
                 when (requestCode) {
                     Constants.ACT_DOC_CAM_CODE -> handleDocumentCapture(data)
@@ -182,6 +191,7 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             RESULT_CANCELED -> mResult?.error(RESULT_CANCELED.toString(), "Cancelled", null)
             else -> mResult?.error("3", "Something went wrong", null)
         }
+        resultSubmitted = true
         return true
     }
 
