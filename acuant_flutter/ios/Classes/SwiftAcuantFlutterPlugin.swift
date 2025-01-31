@@ -110,18 +110,21 @@ extension SwiftAcuantFlutterPlugin {
 
 extension SwiftAcuantFlutterPlugin: CameraCaptureDelegate {
     public func setCapturedImage(image: AcuantCommon.Image, barcodeString: String?) {
-        if image.image != nil {
+        if let capturedImage = image.image {
             ImagePreparation.evaluateImage(data: CroppingData.newInstance(image: image)) { result, error in
                 DispatchQueue.main.async {
-                    if result != nil {
+                    if let evaluatedResult = result {
+                        let croppedImage = ImagePreparation.crop(data: CroppingData.newInstance(image: image)).image ?? capturedImage
+                        let resizedImage = ImagePreparation.resize(image: croppedImage, targetWidth: 720) ?? croppedImage
+                        let compressedImageData = resizedImage.jpegData(compressionQuality: 0.8)
                         var res: [String: Any] = [:]
-                        res["RAW_BYTES"] = FlutterStandardTypedData(bytes: result!.image.jpegData(compressionQuality: 1)!)
-                        res["ASPECT_RATIO"] = result!.image.size.width / result!.image.size.height
-                        res["DPI"] = result!.dpi
-                        res["GLARE"] = result!.glare
+                        res["RAW_BYTES"] = FlutterStandardTypedData(bytes: compressedImageData!)
+                        res["ASPECT_RATIO"] = evaluatedResult.image.size.width / evaluatedResult.image.size.height
+                        res["DPI"] = evaluatedResult.dpi
+                        res["GLARE"] = evaluatedResult.glare
                         res["IS_CORRECT_ASPECT_RATIO"] = true
-                        res["IS_PASSPORT"] = result!.isPassport
-                        res["SHARPNESS"] = result!.sharpness
+                        res["IS_PASSPORT"] = evaluatedResult.isPassport
+                        res["SHARPNESS"] = evaluatedResult.sharpness
                         self.mResult?(res)
                         self.mResult = nil
                     } else {
@@ -159,21 +162,40 @@ extension SwiftAcuantFlutterPlugin {
             faceCameraController.callback = { [weak self] faceCaptureResult in
                 if faceCaptureResult != nil {
                     var res: [String: Any] = [:]
-                    res["RAW_BYTES"] = FlutterStandardTypedData(bytes: faceCaptureResult!.jpegData)
-                    res["LIVE"] = "facialLivelinessResultString"
-                    self?.mResult?(res)
+                    
+                    let workItem = DispatchWorkItem {
+                        let croppedImage = ImagePreparation.crop(data: CroppingData.newInstance(image: AcuantCommon.Image.newInstance(image: faceCaptureResult!.image, data: nil)))
+                        // Call the completion handler with the croppedImage
+                        print("Cropped Image")
+                        DispatchQueue.main.async {
+                            self?.handleCroppedImage(croppedImage.image, faceCaptureResult: faceCaptureResult!, res: &res)
+                        }
+                    }
+
+                    // Execute the work item asynchronously
+                    DispatchQueue.global().async(execute: workItem)
                 } else {
                     self?.mResult?(FlutterError(code: "1", message: "Something went wrong", details: "Can not find captured image"))
+                    self?.mResult = nil
+                    self!.dismissCamVC()
                 }
-                self?.mResult = nil
-                self!.dismissCamVC()
             }
-            
             let camNavCtrl = UINavigationController(rootViewController: faceCameraController)
             camNavCtrl.view.addSubview(self.createBackButton())
             camNavCtrl.modalPresentationStyle = .fullScreen
             camNavCtrl.view.backgroundColor = .black
             UIApplication.shared.keyWindow?.rootViewController?.present(camNavCtrl, animated: true)
+     
         }
+    }
+
+    private func handleCroppedImage(_ croppedImage: UIImage?, faceCaptureResult: FaceCaptureResult, res: inout [String: Any]) {
+        let resizedImage = ImagePreparation.resize(image: croppedImage ?? faceCaptureResult.image, targetWidth: 720)
+        let compressedImageData = resizedImage!.jpegData(compressionQuality: 0.8)
+        res["RAW_BYTES"] = FlutterStandardTypedData(bytes: compressedImageData ?? faceCaptureResult.jpegData)
+        res["LIVE"] = "facialLivelinessResultString"
+        mResult?(res)
+        mResult = nil
+        dismissCamVC()
     }
 }

@@ -48,6 +48,7 @@ import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry
 import io.flutter.plugin.common.PluginRegistry.Registrar
 import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 
@@ -81,12 +82,14 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
 //    private var processingFacialLiveness = false
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
+        resultSubmitted = false
         if (call.method != Constants.REQ_INITIALIZE && !isInitialized) {
             result.error("10", "Please initialize first", null)
         } else {
             mResult = result;
             when (call.method) {
                 Constants.REQ_INITIALIZE -> {
+
                     val username = call.argument<String>("username")
                     val password = call.argument<String>("password")
                     val subscription = call.argument<String>("subscription")
@@ -97,12 +100,12 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
                     }
                 }
                 Constants.REQ_DOC_CAM -> {
-                    resultSubmitted = false
+
                     val isBack = call.argument<Boolean>("isBack")
                     showDocumentCapture(isBack ?: false)
                 }
                 Constants.REQ_FACE_CAM ->{
-                    resultSubmitted = false
+
                      showFaceCapture()
                 }
                 else -> result.notImplemented()
@@ -132,9 +135,15 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             AcuantImagePreparation.evaluateImage(activity!!, CroppingData(url), object :
                 EvaluateImageListener {
                 override fun onSuccess(image: AcuantImage) {
+                    val bitmap = BitmapFactory.decodeByteArray(image.rawBytes, 0, image.rawBytes.size)
+                    val resizedBitmap = Bitmap.createScaledBitmap(bitmap, (720*image.aspectRatio).toInt(), 720, true)
+                    val outputStream = ByteArrayOutputStream()
+                    resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream) // Adjust the quality as needed
+                    val compressedImageBytes = outputStream.toByteArray()
+                    
                     mResult?.success(
                         hashMapOf(
-                            "RAW_BYTES" to image.rawBytes,
+                            "RAW_BYTES" to compressedImageBytes,
                             "ASPECT_RATIO" to image.aspectRatio,
                             "DPI" to image.dpi,
                             "GLARE" to image.glare,
@@ -162,9 +171,16 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             mResult?.error("1", "Something went wrong", "Can not find captured image")
         } else {
             val bytes = readFromFile(url)
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            val aspectRatio = bitmap.width.toFloat() / bitmap.height.toFloat()
+            val resizedBitmap = Bitmap.createScaledBitmap(bitmap, 720, (720 / aspectRatio).toInt(), true)
+            val outputStream = ByteArrayOutputStream()
+            resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream) // Adjust the quality as needed
+            val compressedImageBytes = outputStream.toByteArray()
+            
             mResult?.success(
                 hashMapOf(
-                    "RAW_BYTES" to bytes,
+                    "RAW_BYTES" to compressedImageBytes,
                     "LIVE" to "facialLivelinessResultString",
                 )
             )
@@ -173,10 +189,9 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
         if(resultSubmitted) {
-                return false
-            }
+            return false
+        }
         when (resultCode) {
-
             RESULT_OK -> {
                 when (requestCode) {
                     Constants.ACT_DOC_CAM_CODE -> handleDocumentCapture(data)
@@ -188,8 +203,11 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
                     )
                 }
             }
-            RESULT_CANCELED -> mResult?.error(RESULT_CANCELED.toString(), "Cancelled", null)
-            else -> mResult?.error("3", "Something went wrong", null)
+            else -> mResult?.error(
+                "3",
+                "Operation cancelled",
+                "The operation was cancelled or failed"
+            )
         }
         resultSubmitted = true
         return true
