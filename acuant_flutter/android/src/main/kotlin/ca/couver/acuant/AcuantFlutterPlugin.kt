@@ -46,7 +46,6 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry
-import io.flutter.plugin.common.PluginRegistry.Registrar
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -55,24 +54,6 @@ import java.io.FileInputStream
 
 class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     PluginRegistry.ActivityResultListener {
-
-    companion object {
-        @JvmStatic
-        fun registerWith(registrar: Registrar) {
-            registrar.activity()?.let {
-                // If a background flutter view tries to register the plugin,
-                // there will be no activity from the registrar,
-                // we stop the registering process immediately because the plugin requires an activity.
-
-                val AcuantFlutterPlugin = AcuantFlutterPlugin()
-                AcuantFlutterPlugin.activity = it
-                AcuantFlutterPlugin.mChannel =
-                    MethodChannel(registrar.messenger(), "ca.couver.acuantchannel")
-                AcuantFlutterPlugin.mChannel?.setMethodCallHandler(AcuantFlutterPlugin)
-                registrar.addActivityResultListener(AcuantFlutterPlugin)
-            }
-        }
-    }
 
     private var mChannel: MethodChannel? = null
     private var mResult: Result? = null
