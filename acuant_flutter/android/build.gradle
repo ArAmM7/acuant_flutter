@@ -3,13 +3,14 @@ version '1.0-SNAPSHOT'
 
 buildscript {
     ext.kotlin_version = '1.7.0'
-    ext.acuant_version = '11.5.4'
+    ext.acuant_version = '11.6.3'
     repositories {
         google()
         mavenCentral()
         jcenter()
         maven { url 'https://raw.githubusercontent.com/Acuant/AndroidSdkMaven/main/maven/' }
         maven { url 'https://raw.githubusercontent.com/iProov/android/master/maven/' }
+        maven { url 'https://jitpack.io' }
     }
 
     dependencies {
@@ -26,6 +27,7 @@ rootProject.allprojects {
         jcenter()
         maven { url 'https://raw.githubusercontent.com/Acuant/AndroidSdkMaven/main/maven/' }
         maven { url 'https://raw.githubusercontent.com/iProov/android/master/maven/' }
+        maven { url 'https://jitpack.io' }
     }
 }
 
@@ -33,7 +35,7 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 31
+    compileSdkVersion 35
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -54,7 +56,7 @@ android {
 
     defaultConfig {
         minSdkVersion 21
-        targetSdkVersion 31
+        targetSdkVersion 35
         versionCode 1
         versionName "1.0"
         multiDexEnabled true
@@ -89,7 +91,7 @@ dependencies {
     implementation "com.acuant:acuantdocumentprocessing:$acuant_version"
 //    implementation "com.acuant:acuantechipreader:$acuant_version"
     implementation "com.acuant:acuantfacematch:$acuant_version"
-    implementation "com.acuant:acuantipliveness:$acuant_version"
+    // Note: acuantipliveness was removed in SDK v11.6.3 - use acuantpassiveliveness instead
     implementation "com.acuant:acuantpassiveliveness:$acuant_version"
 
     // acuantcamera ----------------

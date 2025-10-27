@@ -11,7 +11,6 @@ import ca.couver.acuantcamera.camera.AcuantCameraOptions
 //import ca.couver.acuantcamera.camera.AcuantCameraOptions
 
 import ca.couver.acuantcamera.constant.ACUANT_EXTRA_CAMERA_OPTIONS
-import ca.couver.acuantcamera.constant.ACUANT_EXTRA_IMAGE_URL
 
 class ActivityRunner : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,7 +42,9 @@ class ActivityRunner : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
                 val data: Intent? = result.data
-                val url = data?.getStringExtra(ACUANT_EXTRA_IMAGE_URL)
+                // Updated for SDK 11.6.0+: Use getLatestCapturedBytes instead of file path
+                val bytes = AcuantCameraActivity.getLatestCapturedBytes(clearBytesAfterRead = true)
+                // Process bytes as needed
             }
         }
 }
