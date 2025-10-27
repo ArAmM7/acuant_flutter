@@ -17,10 +17,7 @@ A new Flutter plugin project.
   s.dependency "Flutter"
   s.platform = :ios, "11.0"
 
-  s.dependency "AcuantiOSSDKV11", "~> 11.5.8"
-  #  s.dependency 'AcuantiOSSDKV11/AcuantCamera'
-  #  s.dependency 'AcuantiOSSDKV11/AcuantImagePreparation'
-  #  s.dependency 'AcuantiOSSDKV11/AcuantDocumentProcessing'
+  s.dependency 'AcuantiOSSDKV11', '11.6.5'
 
   # Flutter.framework does not contain a i386 slice.
   s.pod_target_xcconfig = {
