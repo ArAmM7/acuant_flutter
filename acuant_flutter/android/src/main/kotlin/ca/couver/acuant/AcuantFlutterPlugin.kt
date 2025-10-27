@@ -13,7 +13,6 @@ import androidx.annotation.NonNull
 import ca.couver.acuantcamera.camera.AcuantCameraActivity
 import ca.couver.acuantcamera.camera.AcuantCameraOptions
 import ca.couver.acuantcamera.constant.ACUANT_EXTRA_CAMERA_OPTIONS
-import ca.couver.acuantcamera.constant.ACUANT_EXTRA_IMAGE_URL
 
 // Acuant
 import ca.couver.acuantcamera.initializer.MrzCameraInitializer
@@ -29,7 +28,6 @@ import com.acuant.acuantcommon.model.AcuantError
 import com.acuant.acuantcommon.model.Credential
 import com.acuant.acuantimagepreparation.AcuantImagePreparation
 import com.acuant.acuantimagepreparation.background.EvaluateImageListener
-import com.acuant.acuantimagepreparation.initializer.ImageProcessorInitializer
 import com.acuant.acuantimagepreparation.model.AcuantImage
 import com.acuant.acuantimagepreparation.model.CroppingData
 import com.acuant.acuantpassiveliveness.AcuantPassiveLiveness
@@ -115,13 +113,14 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         Log.d("AcuantFlutter", "handleDocumentCapture called, resultSubmitted: $resultSubmitted")
         if (resultSubmitted) return
         
-        val url = data?.getStringExtra(ACUANT_EXTRA_IMAGE_URL)
-        Log.d("AcuantFlutter", "Document image URL: $url")
-        if (url == null) {
+        // Updated for SDK 11.6.0+: Use getLatestCapturedBytes instead of file path
+        val bytes = AcuantCameraActivity.getLatestCapturedBytes(clearBytesAfterRead = true)
+        Log.d("AcuantFlutter", "Document image bytes: ${bytes?.size}")
+        if (bytes == null) {
             mResult?.error("1", "Something went wrong", "Can not find captured image")
             resultSubmitted = true
         } else {
-            AcuantImagePreparation.evaluateImage(activity!!, CroppingData(url), object :
+            AcuantImagePreparation.evaluateImage(activity!!, CroppingData(bytes), object :
                 EvaluateImageListener {
                 override fun onSuccess(image: AcuantImage) {
                     Log.d("AcuantFlutter", "Image evaluation success, resultSubmitted: $resultSubmitted")
@@ -269,23 +268,29 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
                     mResult?.error("100", "Android Activity not found", null);
                     resultSubmitted = true
                 }
+            } else if (username == null || password == null) {
+                if (!resultSubmitted) {
+                    mResult?.error("101", "Username and password are required", null);
+                    resultSubmitted = true
+                }
             } else {
                 Credential.init(
                     username,
                     password,
                     subscription,
-                    "https://frm.acuant.net",
+                    "https://us.acas.acuant.net",
                     "https://services.assureid.net",
-                    "https://medicscan.acuant.net",
+                    "https://frm.acuant.net",
                     "https://us.passlive.acuant.net",
-                    "https://acas.acuant.net",
-                    "https://ozone.acuant.net"
+                    null, // ipLivenessEndpoint (removed in v11.6.3)
+                    "https://ozone.acuant.net",
+                    "https://medicscan.acuant.net"
                 )
 
                 AcuantInitializer.initialize(
                     null,
                     activity!!,
-                    listOf(ImageProcessorInitializer(), MrzCameraInitializer()),
+                    listOf(MrzCameraInitializer()),
                     handleInitialize
                 )
             }

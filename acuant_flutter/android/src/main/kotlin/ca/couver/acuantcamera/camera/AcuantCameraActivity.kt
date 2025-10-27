@@ -20,6 +20,24 @@ class AcuantCameraActivity : AppCompatActivity(), ICameraActivityFinish {
 
     private lateinit var binding: ActivityCameraBinding
 
+    companion object {
+        // Static storage for captured bytes (v11.6.0+)
+        private var latestCapturedBytes: ByteArray? = null
+        
+        /**
+         * Get the latest captured image bytes
+         * @param clearBytesAfterRead If true, clears the bytes after reading (recommended for security)
+         */
+        @JvmStatic
+        fun getLatestCapturedBytes(clearBytesAfterRead: Boolean = true): ByteArray? {
+            val bytes = latestCapturedBytes
+            if (clearBytesAfterRead) {
+                latestCapturedBytes = null
+            }
+            return bytes
+        }
+    }
+
     //Camera Launch
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.MaterialTheme)
@@ -59,6 +77,12 @@ class AcuantCameraActivity : AppCompatActivity(), ICameraActivityFinish {
 
     //Camera Responses
     override fun onCameraDone(imageUrl: String, barCodeString: String?) {
+        // Store bytes in static field for SDK 11.6.0+
+        val file = java.io.File(imageUrl)
+        if (file.exists()) {
+            latestCapturedBytes = file.readBytes()
+        }
+        
         val intent = Intent()
         intent.putExtra(ACUANT_EXTRA_IMAGE_URL, imageUrl)
         intent.putExtra(ACUANT_EXTRA_PDF417_BARCODE, barCodeString)

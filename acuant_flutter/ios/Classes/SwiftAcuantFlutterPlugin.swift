@@ -1,15 +1,14 @@
 import Flutter
 import UIKit
+import AVFoundation
 
+import AcuantiOSSDKV11
 import AcuantCommon
+import AcuantImagePreparation
 import AcuantDocumentProcessing
 import AcuantFaceMatch
 import AcuantHGLiveness
-import AcuantImagePreparation
-import AcuantiOSSDKV11
-import AcuantIPLiveness
 import AcuantPassiveLiveness
-import AVFoundation
 
 public class SwiftAcuantFlutterPlugin: NSObject, FlutterPlugin {
     var mResult: FlutterResult?
@@ -108,8 +107,8 @@ extension SwiftAcuantFlutterPlugin {
     }
 }
 
-extension SwiftAcuantFlutterPlugin: CameraCaptureDelegate {
-    public func setCapturedImage(image: AcuantCommon.Image, barcodeString: String?) {
+extension SwiftAcuantFlutterPlugin: DocumentCameraViewControllerDelegate {
+    public func onCaptured(image: Image, barcodeString: String?) {
         if let capturedImage = image.image {
             ImagePreparation.evaluateImage(data: CroppingData.newInstance(image: image)) { result, error in
                 DispatchQueue.main.async {
@@ -143,13 +142,42 @@ extension SwiftAcuantFlutterPlugin: CameraCaptureDelegate {
     
     func showCamera(result: @escaping FlutterResult) {
         mResult = result
-        let options = CameraOptions(autoCapture: true, hideNavigationBar: false, showBackButton: false)
-        let documentCameraController = DocumentCameraController.getCameraController(delegate: self, cameraOptions: options)
         
-        let camNavCtrl = UINavigationController(rootViewController: documentCameraController)
+        let textForState: (DocumentCameraState) -> String = { state in
+            switch state {
+            case .align: return "ALIGN"
+            case .moveCloser: return "MOVE CLOSER"
+            case .tooClose: return "TOO CLOSE"
+            case .steady: return "HOLD STEADY"
+            case .hold: return "HOLD STEADY"
+            case .capture: return "CAPTURING"
+            @unknown default: return ""
+            }
+        }
+        
+        let colorForState: (DocumentCameraState) -> CGColor = { state in
+            switch state {
+            case .align, .moveCloser, .tooClose: return UIColor.red.cgColor
+            case .steady, .hold: return UIColor.yellow.cgColor
+            case .capture: return UIColor.green.cgColor
+            @unknown default: return UIColor.black.cgColor
+            }
+        }
+        
+        let options = DocumentCameraOptions(
+            hideNavigationBar: false,
+            showBackButton: false,
+            autoCapture: true,
+            textForState: textForState,
+            colorForState: colorForState
+        )
+        let documentCameraViewController = DocumentCameraViewController(options: options)
+        documentCameraViewController.delegate = self
+        
+        let camNavCtrl = UINavigationController(rootViewController: documentCameraViewController)
         camNavCtrl.view.addSubview(createBackButton())
-        camNavCtrl.modalPresentationStyle = .fullScreen
-        camNavCtrl.view.backgroundColor = .black
+        camNavCtrl.modalPresentationStyle = UIModalPresentationStyle.fullScreen
+        camNavCtrl.view.backgroundColor = UIColor.black
         UIApplication.shared.keyWindow?.rootViewController?.present(camNavCtrl, animated: true)
     }
 }
@@ -164,7 +192,7 @@ extension SwiftAcuantFlutterPlugin {
                     var res: [String: Any] = [:]
                     
                     let workItem = DispatchWorkItem {
-                        let croppedImage = ImagePreparation.crop(data: CroppingData.newInstance(image: AcuantCommon.Image.newInstance(image: faceCaptureResult!.image, data: nil)))
+                        let croppedImage = ImagePreparation.crop(data: CroppingData.newInstance(image: Image.newInstance(image: faceCaptureResult!.image, data: nil)))
                         // Call the completion handler with the croppedImage
                         print("Cropped Image")
                         DispatchQueue.main.async {
