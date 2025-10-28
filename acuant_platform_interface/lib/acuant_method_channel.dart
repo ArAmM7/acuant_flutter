@@ -24,9 +24,11 @@ class MethodChannelAcuant extends AcuantPlatform {
   }
 
   @override
-  Future showDocumentCamera({isBack = false}) async {
-    final res = await methodChannel
-        .invokeMethod('SHOW_DOCUMENT_CAMERA', {"isBack": isBack});
+  Future showDocumentCamera({isBack = false, String? title}) async {
+    final res = await methodChannel.invokeMethod('SHOW_DOCUMENT_CAMERA', {
+      'isBack': isBack,
+      'title': title ?? '',
+    });
     return res;
   }
 

@@ -35,7 +35,7 @@ abstract class AcuantPlatform extends PlatformInterface {
     throw UnimplementedError('initialize() has not been implemented.');
   }
 
-  Future showDocumentCamera({bool isBack = false}) {
+  Future showDocumentCamera({bool isBack = false, String? title}) {
     throw UnimplementedError('showDocumentCamera() has not been implemented.');
   }
 
