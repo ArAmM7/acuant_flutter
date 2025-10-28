@@ -167,6 +167,14 @@ abstract class AcuantBaseCameraFragment : Fragment() {
         fragmentCameraBinding?.backButton?.setOnClickListener {
             cameraActivityListener.onCancel()
         }
+        
+        // Set title if provided
+        val title = arguments?.getString("CAMERA_TITLE")
+        if (title != null && title.isNotEmpty()) {
+            fragmentCameraBinding?.cameraTitle?.text = title
+            fragmentCameraBinding?.cameraTitle?.visibility = View.VISIBLE
+        }
+        
         return fragmentCameraBinding!!.root
     }
 

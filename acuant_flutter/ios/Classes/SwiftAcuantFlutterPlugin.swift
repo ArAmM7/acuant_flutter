@@ -39,7 +39,7 @@ public class SwiftAcuantFlutterPlugin: NSObject, FlutterPlugin {
                 initAcuant(result: result, call: call)
             }
         case "SHOW_DOCUMENT_CAMERA":
-            showCamera(result: result)
+            showCamera(result: result, call: call)
         case "SHOW_FACE_CAMERA":
             showPassiveLiveness(result: result)
         default:
@@ -105,6 +105,20 @@ extension SwiftAcuantFlutterPlugin {
         button.addTarget(self, action: #selector(dismissCamVC), for: .touchUpInside)
         return button
     }
+    
+    func createTitleLabel(title: String) -> UILabel {
+        let label = UILabel()
+        label.text = title
+        label.textColor = .white
+        label.font = UIFont.boldSystemFont(ofSize: 18)
+        label.sizeToFit()
+        // Position it to the right of the back button, vertically centered
+        let xPosition: CGFloat = 15 + 58 + 15 // back button x + width + padding
+        let buttonYCenter: CGFloat = UIApplication.shared.statusBarFrame.height + 15 + 29 // back button center Y
+        let yPosition: CGFloat = buttonYCenter - (label.frame.height / 2)
+        label.frame = CGRect(x: xPosition, y: yPosition, width: label.frame.width, height: label.frame.height)
+        return label
+    }
 }
 
 extension SwiftAcuantFlutterPlugin: DocumentCameraViewControllerDelegate {
@@ -140,8 +154,12 @@ extension SwiftAcuantFlutterPlugin: DocumentCameraViewControllerDelegate {
         }
     }
     
-    func showCamera(result: @escaping FlutterResult) {
+    func showCamera(result: @escaping FlutterResult, call: FlutterMethodCall) {
         mResult = result
+        
+        // Extract title from arguments
+        let arguments = call.arguments as? [String: Any]
+        let title = arguments?["title"] as? String ?? ""
         
         let textForState: (DocumentCameraState) -> String = { state in
             switch state {
@@ -176,6 +194,12 @@ extension SwiftAcuantFlutterPlugin: DocumentCameraViewControllerDelegate {
         
         let camNavCtrl = UINavigationController(rootViewController: documentCameraViewController)
         camNavCtrl.view.addSubview(createBackButton())
+        
+        // Add title label if title is not empty
+        if !title.isEmpty {
+            camNavCtrl.view.addSubview(createTitleLabel(title: title))
+        }
+        
         camNavCtrl.modalPresentationStyle = UIModalPresentationStyle.fullScreen
         camNavCtrl.view.backgroundColor = UIColor.black
         UIApplication.shared.keyWindow?.rootViewController?.present(camNavCtrl, animated: true)

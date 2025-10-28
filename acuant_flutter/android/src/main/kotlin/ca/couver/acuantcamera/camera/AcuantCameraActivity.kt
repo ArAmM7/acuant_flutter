@@ -54,6 +54,9 @@ class AcuantCameraActivity : AppCompatActivity(), ICameraActivityFinish {
             unserializedOptions as AcuantCameraOptions
         }
 
+        // Get title from intent
+        val title = intent.getStringExtra("CAMERA_TITLE")
+
         //start the camera if this is the first time the activity is created (camera already exists otherwise)
         if (savedInstanceState == null) {
             val cameraFragment: AcuantBaseCameraFragment = when (options.cameraMode) {
@@ -66,6 +69,13 @@ class AcuantCameraActivity : AppCompatActivity(), ICameraActivityFinish {
                 else -> { //Document
                     AcuantDocCameraFragment.newInstance(options)
                 }
+            }
+
+            // Pass title to fragment
+            if (title != null && title.isNotEmpty()) {
+                val args = cameraFragment.arguments ?: Bundle()
+                args.putString("CAMERA_TITLE", title)
+                cameraFragment.arguments = args
             }
 
             supportFragmentManager.beginTransaction()

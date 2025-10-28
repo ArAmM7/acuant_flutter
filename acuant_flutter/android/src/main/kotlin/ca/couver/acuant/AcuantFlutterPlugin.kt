@@ -85,7 +85,8 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             }
             Constants.REQ_DOC_CAM -> {
                 val isBack = call.argument<Boolean>("isBack")
-                showDocumentCapture(isBack ?: false)
+                val title = call.argument<String>("title")
+                showDocumentCapture(isBack ?: false, title)
             }
             Constants.REQ_FACE_CAM -> {
                 showFaceCapture()
@@ -301,7 +302,7 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     }
 
 
-    private fun showDocumentCapture(isBack: Boolean = false) {
+    private fun showDocumentCapture(isBack: Boolean = false, title: String? = null) {
         activity?.let {
             val cameraIntent = Intent(
                 it,
@@ -313,6 +314,10 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
                     .DocumentCameraOptionsBuilder().setBack(isBack)
                     .build()
             )
+            // Pass title to the camera activity
+            if (title != null && title.isNotEmpty()) {
+                cameraIntent.putExtra("CAMERA_TITLE", title)
+            }
             it.startActivityForResult(cameraIntent, Constants.ACT_DOC_CAM_CODE)
         }
     }
