@@ -2,6 +2,7 @@ import Flutter
 import UIKit
 import AVFoundation
 
+#if !targetEnvironment(simulator)
 import AcuantiOSSDKV11
 import AcuantCommon
 import AcuantImagePreparation
@@ -9,6 +10,7 @@ import AcuantDocumentProcessing
 import AcuantFaceMatch
 import AcuantHGLiveness
 import AcuantPassiveLiveness
+#endif
 
 public class SwiftAcuantFlutterPlugin: NSObject, FlutterPlugin {
     var mResult: FlutterResult?
@@ -23,6 +25,9 @@ public class SwiftAcuantFlutterPlugin: NSObject, FlutterPlugin {
     }
     
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        #if targetEnvironment(simulator)
+        result(FlutterError(code: "SIMULATOR", message: "Acuant SDK is not available on the simulator", details: nil))
+        #else
         if call.method != "INITIALIZE" && !initialized {
             result(FlutterError(code: "2", message: "Please initialize first", details: nil))
             return
@@ -45,9 +50,11 @@ public class SwiftAcuantFlutterPlugin: NSObject, FlutterPlugin {
         default:
             result(FlutterMethodNotImplemented)
         }
+        #endif
     }
 }
 
+#if !targetEnvironment(simulator)
 extension SwiftAcuantFlutterPlugin {
     func initAcuant(result: @escaping FlutterResult, call: FlutterMethodCall) {
         // Build the params
@@ -83,6 +90,7 @@ extension SwiftAcuantFlutterPlugin {
         }
     }
 }
+#endif
 
 extension SwiftAcuantFlutterPlugin {
     @objc func dismissCamVC() {
@@ -121,6 +129,7 @@ extension SwiftAcuantFlutterPlugin {
     }
 }
 
+#if !targetEnvironment(simulator)
 extension SwiftAcuantFlutterPlugin: DocumentCameraViewControllerDelegate {
     public func onCaptured(image: Image, barcodeString: String?) {
         if let capturedImage = image.image {
@@ -251,3 +260,4 @@ extension SwiftAcuantFlutterPlugin {
         dismissCamVC()
     }
 }
+#endif
