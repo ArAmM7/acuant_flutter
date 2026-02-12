@@ -26,7 +26,7 @@ public class SwiftAcuantFlutterPlugin: NSObject, FlutterPlugin {
     
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         #if targetEnvironment(simulator)
-        result(FlutterError(code: "SIMULATOR", message: "Acuant SDK is not available on the simulator", details: nil))
+        result(FlutterError(code: "0", message: "Acuant SDK is not available on the simulator", details: nil))
         #else
         if call.method != "INITIALIZE" && !initialized {
             result(FlutterError(code: "2", message: "Please initialize first", details: nil))
