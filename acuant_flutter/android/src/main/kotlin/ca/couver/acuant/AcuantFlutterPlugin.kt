@@ -4,10 +4,14 @@ package ca.couver.acuant
 import android.app.Activity
 import android.app.Activity.RESULT_CANCELED
 import android.app.Activity.RESULT_OK
+import android.app.Application
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.NonNull
@@ -52,7 +56,7 @@ import java.io.FileInputStream
 
 
 class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
-    PluginRegistry.ActivityResultListener {
+    PluginRegistry.ActivityResultListener, Application.ActivityLifecycleCallbacks {
 
     private var mChannel: MethodChannel? = null
     private var mResult: Result? = null
@@ -62,6 +66,7 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     private var lastIsBack: Boolean = false
     private var lastTitle: String? = null
     private var cropRetryCount: Int = 0
+    private var pendingRetryRelaunch: Boolean = false
 //    private var processingFacialLiveness = false
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
@@ -163,13 +168,21 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
                             "AcuantFlutter",
                             "Crop failed (-6), retrying (attempt $cropRetryCount/$MAX_CROP_RETRIES)"
                         )
+                        // Defer the relaunch until the previous AcuantCameraActivity
+                        // is actually destroyed (observed via ActivityLifecycleCallbacks).
+                        // A fixed wall-clock delay isn't reliable: Flutter's redraw
+                        // when the host activity briefly resumes can starve the main
+                        // looper for several seconds, and CameraX in the destroying
+                        // activity releases camera 0 on a background thread — a new
+                        // AcuantCameraActivity launched before that completes loses
+                        // its preview pipeline and shows a black screen.
+                        pendingRetryRelaunch = true
                         activity?.runOnUiThread {
                             Toast.makeText(
                                 activity,
                                 "Could not read document, please retake",
                                 Toast.LENGTH_LONG
                             ).show()
-                            showDocumentCapture(lastIsBack, lastTitle)
                         }
                         return
                     }
@@ -403,6 +416,7 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity;
         binding.addActivityResultListener(this)
+        activity?.application?.registerActivityLifecycleCallbacks(this)
     }
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
@@ -413,9 +427,35 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     }
 
     override fun onDetachedFromActivity() {
+        activity?.application?.unregisterActivityLifecycleCallbacks(this)
+    }
+
+    // --- Application.ActivityLifecycleCallbacks ---
+
+    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+    override fun onActivityStarted(activity: Activity) {}
+    override fun onActivityResumed(activity: Activity) {}
+    override fun onActivityPaused(activity: Activity) {}
+    override fun onActivityStopped(activity: Activity) {}
+    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+
+    override fun onActivityDestroyed(destroyedActivity: Activity) {
+        if (!pendingRetryRelaunch) return
+        if (destroyedActivity !is AcuantCameraActivity) return
+        pendingRetryRelaunch = false
+        Log.d("AcuantFlutter", "AcuantCameraActivity destroyed, scheduling retry relaunch")
+        // Small delay covers CameraX's background-thread releaseCameraDevice
+        // finishing after Java-side onDestroy has returned.
+        Handler(Looper.getMainLooper()).postDelayed({
+            showDocumentCapture(lastIsBack, lastTitle)
+        }, RELAUNCH_DELAY_MS)
     }
 
     companion object {
         private const val MAX_CROP_RETRIES = 2
+        // Tail wait after AcuantCameraActivity#onDestroy returns, covering
+        // CameraX's background-thread releaseCameraDevice completing before
+        // we open the camera again.
+        private const val RELAUNCH_DELAY_MS = 200L
     }
 }
