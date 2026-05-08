@@ -67,6 +67,10 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     private var lastTitle: String? = null
     private var cropRetryCount: Int = 0
     private var pendingRetryRelaunch: Boolean = false
+    private var cameraActivityDestroyed: Boolean = false
+    private var retryMessage: String? = null
+    private val retryHandler = Handler(Looper.getMainLooper())
+    private var retryRunnable: Runnable? = null
 //    private var processingFacialLiveness = false
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
@@ -95,7 +99,13 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             Constants.REQ_DOC_CAM -> {
                 val isBack = call.argument<Boolean>("isBack")
                 val title = call.argument<String>("title")
+                val retryMsg = call.argument<String>("retryMessage")
+                retryRunnable?.let { retryHandler.removeCallbacks(it) }
+                retryRunnable = null
                 cropRetryCount = 0
+                pendingRetryRelaunch = false
+                cameraActivityDestroyed = false
+                retryMessage = retryMsg?.takeIf { it.isNotEmpty() }
                 showDocumentCapture(isBack ?: false, title)
             }
             Constants.REQ_FACE_CAM -> {
@@ -180,10 +190,11 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
                         activity?.runOnUiThread {
                             Toast.makeText(
                                 activity,
-                                "Could not read document, please retake",
+                                retryMessage ?: DEFAULT_RETRY_MESSAGE,
                                 Toast.LENGTH_LONG
                             ).show()
                         }
+                        if (cameraActivityDestroyed) triggerRetry()
                         return
                     }
 
@@ -424,10 +435,12 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
+        onDetachedFromActivity()
     }
 
     override fun onDetachedFromActivity() {
         activity?.application?.unregisterActivityLifecycleCallbacks(this)
+        activity = null
     }
 
     // --- Application.ActivityLifecycleCallbacks ---
@@ -439,16 +452,23 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     override fun onActivityStopped(activity: Activity) {}
     override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
 
-    override fun onActivityDestroyed(destroyedActivity: Activity) {
-        if (!pendingRetryRelaunch) return
-        if (destroyedActivity !is AcuantCameraActivity) return
+    private fun triggerRetry() {
+        // Consume both signals so a second arrival can't double-schedule.
         pendingRetryRelaunch = false
-        Log.d("AcuantFlutter", "AcuantCameraActivity destroyed, scheduling retry relaunch")
+        cameraActivityDestroyed = false
+        Log.d("AcuantFlutter", "scheduling retry relaunch")
         // Small delay covers CameraX's background-thread releaseCameraDevice
         // finishing after Java-side onDestroy has returned.
-        Handler(Looper.getMainLooper()).postDelayed({
-            showDocumentCapture(lastIsBack, lastTitle)
-        }, RELAUNCH_DELAY_MS)
+        val runnable = Runnable { showDocumentCapture(lastIsBack, lastTitle) }
+        retryRunnable = runnable
+        retryHandler.postDelayed(runnable, RELAUNCH_DELAY_MS)
+    }
+
+    override fun onActivityDestroyed(destroyedActivity: Activity) {
+        if (destroyedActivity !is AcuantCameraActivity) return
+        cameraActivityDestroyed = true
+        Log.d("AcuantFlutter", "AcuantCameraActivity destroyed")
+        if (pendingRetryRelaunch) triggerRetry()
     }
 
     companion object {
@@ -457,5 +477,6 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         // CameraX's background-thread releaseCameraDevice completing before
         // we open the camera again.
         private const val RELAUNCH_DELAY_MS = 200L
+        private const val DEFAULT_RETRY_MESSAGE = "Could not read document, please retake"
     }
 }
