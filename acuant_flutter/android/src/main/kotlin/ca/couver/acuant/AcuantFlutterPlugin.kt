@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.util.Log
+import android.widget.Toast
 import androidx.annotation.NonNull
 import ca.couver.acuantcamera.camera.AcuantCameraActivity
 import ca.couver.acuantcamera.camera.AcuantCameraOptions
@@ -58,6 +59,9 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     private var activity: Activity? = null
     private var isInitialized = false
     private var resultSubmitted = false
+    private var lastIsBack: Boolean = false
+    private var lastTitle: String? = null
+    private var cropRetryCount: Int = 0
 //    private var processingFacialLiveness = false
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
@@ -86,6 +90,7 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             Constants.REQ_DOC_CAM -> {
                 val isBack = call.argument<Boolean>("isBack")
                 val title = call.argument<String>("title")
+                cropRetryCount = 0
                 showDocumentCapture(isBack ?: false, title)
             }
             Constants.REQ_FACE_CAM -> {
@@ -150,14 +155,31 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
 
                 override fun onError(error: AcuantError) {
                     Log.d("AcuantFlutter", "Image evaluation error: ${error.errorDescription}")
-                    if (!resultSubmitted) {
-                        mResult?.error(
-                            error.errorCode.toString(),
-                            error.errorDescription,
-                            error.additionalDetails
+                    if (resultSubmitted) return
+
+                    if (error.errorCode == -6 && cropRetryCount < MAX_CROP_RETRIES) {
+                        cropRetryCount++
+                        Log.d(
+                            "AcuantFlutter",
+                            "Crop failed (-6), retrying (attempt $cropRetryCount/$MAX_CROP_RETRIES)"
                         )
-                        resultSubmitted = true
+                        activity?.runOnUiThread {
+                            Toast.makeText(
+                                activity,
+                                "Could not read document, please retake",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            showDocumentCapture(lastIsBack, lastTitle)
+                        }
+                        return
                     }
+
+                    mResult?.error(
+                        error.errorCode.toString(),
+                        error.errorDescription,
+                        error.additionalDetails
+                    )
+                    resultSubmitted = true
                 }
             })
         }
@@ -303,6 +325,8 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
 
 
     private fun showDocumentCapture(isBack: Boolean = false, title: String? = null) {
+        lastIsBack = isBack
+        lastTitle = title
         activity?.let {
             val cameraIntent = Intent(
                 it,
@@ -389,5 +413,9 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     }
 
     override fun onDetachedFromActivity() {
+    }
+
+    companion object {
+        private const val MAX_CROP_RETRIES = 2
     }
 }
