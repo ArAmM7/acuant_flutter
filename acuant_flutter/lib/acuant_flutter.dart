@@ -38,9 +38,12 @@ class Acuant {
   }
 
   Future<AcuantDocumentImage?> showDocumentCamera(
-      {bool isBack = false, String? title}) async {
-    final res = await AcuantPlatform.instance
-        .showDocumentCamera(isBack: isBack, title: title);
+      {bool isBack = false, String? title, String? retryMessage}) async {
+    final res = await AcuantPlatform.instance.showDocumentCamera(
+      isBack: isBack,
+      title: title,
+      retryMessage: retryMessage,
+    );
     if (res is Map) {
       return AcuantDocumentImage.fromMap(res);
     }

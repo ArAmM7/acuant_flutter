@@ -4,11 +4,16 @@ package ca.couver.acuant
 import android.app.Activity
 import android.app.Activity.RESULT_CANCELED
 import android.app.Activity.RESULT_OK
+import android.app.Application
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import androidx.annotation.NonNull
 import ca.couver.acuantcamera.camera.AcuantCameraActivity
 import ca.couver.acuantcamera.camera.AcuantCameraOptions
@@ -51,13 +56,21 @@ import java.io.FileInputStream
 
 
 class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
-    PluginRegistry.ActivityResultListener {
+    PluginRegistry.ActivityResultListener, Application.ActivityLifecycleCallbacks {
 
     private var mChannel: MethodChannel? = null
     private var mResult: Result? = null
     private var activity: Activity? = null
     private var isInitialized = false
     private var resultSubmitted = false
+    private var lastIsBack: Boolean = false
+    private var lastTitle: String? = null
+    private var cropRetryCount: Int = 0
+    private var pendingRetryRelaunch: Boolean = false
+    private var cameraActivityDestroyed: Boolean = false
+    private var retryMessage: String? = null
+    private val retryHandler = Handler(Looper.getMainLooper())
+    private var retryRunnable: Runnable? = null
 //    private var processingFacialLiveness = false
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
@@ -86,6 +99,13 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             Constants.REQ_DOC_CAM -> {
                 val isBack = call.argument<Boolean>("isBack")
                 val title = call.argument<String>("title")
+                val retryMsg = call.argument<String>("retryMessage")
+                retryRunnable?.let { retryHandler.removeCallbacks(it) }
+                retryRunnable = null
+                cropRetryCount = 0
+                pendingRetryRelaunch = false
+                cameraActivityDestroyed = false
+                retryMessage = retryMsg?.takeIf { it.isNotEmpty() }
                 showDocumentCapture(isBack ?: false, title)
             }
             Constants.REQ_FACE_CAM -> {
@@ -150,14 +170,40 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
 
                 override fun onError(error: AcuantError) {
                     Log.d("AcuantFlutter", "Image evaluation error: ${error.errorDescription}")
-                    if (!resultSubmitted) {
-                        mResult?.error(
-                            error.errorCode.toString(),
-                            error.errorDescription,
-                            error.additionalDetails
+                    if (resultSubmitted) return
+
+                    if (error.errorCode == -6 && cropRetryCount < MAX_CROP_RETRIES) {
+                        cropRetryCount++
+                        Log.d(
+                            "AcuantFlutter",
+                            "Crop failed (-6), retrying (attempt $cropRetryCount/$MAX_CROP_RETRIES)"
                         )
-                        resultSubmitted = true
+                        // Defer the relaunch until the previous AcuantCameraActivity
+                        // is actually destroyed (observed via ActivityLifecycleCallbacks).
+                        // A fixed wall-clock delay isn't reliable: Flutter's redraw
+                        // when the host activity briefly resumes can starve the main
+                        // looper for several seconds, and CameraX in the destroying
+                        // activity releases camera 0 on a background thread — a new
+                        // AcuantCameraActivity launched before that completes loses
+                        // its preview pipeline and shows a black screen.
+                        pendingRetryRelaunch = true
+                        activity?.runOnUiThread {
+                            Toast.makeText(
+                                activity,
+                                retryMessage ?: DEFAULT_RETRY_MESSAGE,
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                        if (cameraActivityDestroyed) triggerRetry()
+                        return
                     }
+
+                    mResult?.error(
+                        error.errorCode.toString(),
+                        error.errorDescription,
+                        error.additionalDetails
+                    )
+                    resultSubmitted = true
                 }
             })
         }
@@ -303,6 +349,8 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
 
 
     private fun showDocumentCapture(isBack: Boolean = false, title: String? = null) {
+        lastIsBack = isBack
+        lastTitle = title
         activity?.let {
             val cameraIntent = Intent(
                 it,
@@ -379,6 +427,7 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity;
         binding.addActivityResultListener(this)
+        activity?.application?.registerActivityLifecycleCallbacks(this)
     }
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
@@ -386,8 +435,48 @@ class AcuantFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
+        onDetachedFromActivity()
     }
 
     override fun onDetachedFromActivity() {
+        activity?.application?.unregisterActivityLifecycleCallbacks(this)
+        activity = null
+    }
+
+    // --- Application.ActivityLifecycleCallbacks ---
+
+    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+    override fun onActivityStarted(activity: Activity) {}
+    override fun onActivityResumed(activity: Activity) {}
+    override fun onActivityPaused(activity: Activity) {}
+    override fun onActivityStopped(activity: Activity) {}
+    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+
+    private fun triggerRetry() {
+        // Consume both signals so a second arrival can't double-schedule.
+        pendingRetryRelaunch = false
+        cameraActivityDestroyed = false
+        Log.d("AcuantFlutter", "scheduling retry relaunch")
+        // Small delay covers CameraX's background-thread releaseCameraDevice
+        // finishing after Java-side onDestroy has returned.
+        val runnable = Runnable { showDocumentCapture(lastIsBack, lastTitle) }
+        retryRunnable = runnable
+        retryHandler.postDelayed(runnable, RELAUNCH_DELAY_MS)
+    }
+
+    override fun onActivityDestroyed(destroyedActivity: Activity) {
+        if (destroyedActivity !is AcuantCameraActivity) return
+        cameraActivityDestroyed = true
+        Log.d("AcuantFlutter", "AcuantCameraActivity destroyed")
+        if (pendingRetryRelaunch) triggerRetry()
+    }
+
+    companion object {
+        private const val MAX_CROP_RETRIES = 2
+        // Tail wait after AcuantCameraActivity#onDestroy returns, covering
+        // CameraX's background-thread releaseCameraDevice completing before
+        // we open the camera again.
+        private const val RELAUNCH_DELAY_MS = 200L
+        private const val DEFAULT_RETRY_MESSAGE = "Could not read document, please retake"
     }
 }
