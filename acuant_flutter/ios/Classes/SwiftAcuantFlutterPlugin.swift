@@ -163,9 +163,37 @@ extension SwiftAcuantFlutterPlugin: DocumentCameraViewControllerDelegate {
         }
     }
     
+    private func ensureCameraPermission(result: @escaping FlutterResult, _ proceed: @escaping () -> Void) {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            proceed()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        proceed()
+                    } else {
+                        result(FlutterError(code: "4", message: "Camera permission denied", details: nil))
+                    }
+                }
+            }
+        case .denied, .restricted:
+            result(FlutterError(code: "4", message: "Camera permission denied", details: nil))
+        @unknown default:
+            result(FlutterError(code: "4", message: "Camera permission denied", details: nil))
+        }
+    }
+
     func showCamera(result: @escaping FlutterResult, call: FlutterMethodCall) {
+        ensureCameraPermission(result: result) { [weak self] in
+            guard let self = self else { return }
+            self.presentDocumentCamera(result: result, call: call)
+        }
+    }
+
+    private func presentDocumentCamera(result: @escaping FlutterResult, call: FlutterMethodCall) {
         mResult = result
-        
+
         // Extract title from arguments
         let arguments = call.arguments as? [String: Any]
         let title = arguments?["title"] as? String ?? ""
@@ -217,6 +245,12 @@ extension SwiftAcuantFlutterPlugin: DocumentCameraViewControllerDelegate {
 
 extension SwiftAcuantFlutterPlugin {
     func showPassiveLiveness(result: @escaping FlutterResult) {
+        ensureCameraPermission(result: result) { [weak self] in
+            self?.presentPassiveLiveness(result: result)
+        }
+    }
+
+    private func presentPassiveLiveness(result: @escaping FlutterResult) {
         mResult = result
         DispatchQueue.main.async {
             let faceCameraController = FaceCaptureController()
